@@ -1,0 +1,274 @@
+#!/usr/bin/env python
+
+import socket
+import time
+import threading
+import sys
+import Queue
+import copy
+
+# argv accept input file, python asg2.py 1 setup.txt site1.txt
+def main():
+	if(len(sys.argv) != 4):
+		print("USAGE: python [site_id] [setup_file] [command_file]")
+		exit(1)
+	site_id = int(sys.argv[1])
+	site = Site(site_id)
+	setup_file = sys.argv[2]
+	command_file = sys.argv[3]
+	setup(site, setup_file)
+	execute_commands(site, command_file)
+		
+
+def setup(site, setup_file):
+	#Read setup file. ex - setup.txt     
+	with open(setup_file, 'r') as f:
+		N = int(f.readline().strip())
+		site.num_proc = N
+		process_id = 0
+		for line in f.readlines():
+			process_id += 1
+			if process_id <= N:
+				IP, port = line.strip().split()
+				port = int(port)
+				site.addr_book.append( (IP, port) )
+				if process_id == site.id:
+					site.openListeningSocket( IP, port ) #open for traffic
+			else:
+				source_id, dest_id = line.strip().split()
+				source_id = int(source_id)
+				dest_id = int(dest_id)
+				if source_id == site.id: #I am the sender
+					site.addOutgoingChannel(dest_id)
+				if dest_id == site.id: #I am the receive
+					site.addIncomingChannel(source_id)
+	site.openOutgoingChannels()
+	site.openIncomingChannels()
+	print "Finish Set Up!"
+
+def execute_commands(site, command_file):
+	#Read command file. ex - site1.txt
+	with open(command_file, 'r') as f:
+		for command in f.readlines():
+			command = command.lower().strip()
+			site.execute(command)
+	site.done_processes.add(site.id)
+	site.sendDone(site.id)
+	while True:
+		if site.checkForDone() == True:
+			site.TearDown()
+		site.checkIncomingMsgs()
+
+class Message(object):
+	MARKER_TYPE = 0
+	MONEY_TRANSFER_TYPE = 1
+	DONE_TYPE = 2
+	def __init__(self, source_id, snap_id, amount, type):
+		self.source_id = source_id
+		self.snap_id = snap_id
+		self.amount = amount
+		self.type = type
+
+	def __str__(self):
+		res = str(self.source_id) + " " + str(self.snap_id) + " " + str(self.type) 
+		if self.amount != None:
+			res += " " + str(self.amount)
+		res += "||"
+		return res
+
+	def __repr__(self):
+		return self.__str__()
+
+	@staticmethod
+	def reconstructFromString(str):
+		keyWords = str.strip().split()
+		source_id = int(keyWords[0])
+		snap_id = keyWords[1]
+		msg_type = int(keyWords[2])
+		amount = None
+		if msg_type == Message.MONEY_TRANSFER_TYPE:
+			amount = int(keyWords[3])
+		if msg_type == Message.DONE_TYPE:
+			amount = int(keyWords[3]) #this is Done Process ID
+		return Message(source_id, snap_id, amount, msg_type)
+
+	@staticmethod
+	def split(str):
+		res = []
+		for msg in str.strip().split("||"):
+			res.append(msg)
+		del res[-1]
+		return res
+
+class Site(object):
+	def __init__(self, site_id):
+		self.id = site_id
+		self.snap_count = 0
+		self.snap_count = 0
+		self.balance = 10
+		self.incoming_channels = []
+		self.SnapIDTableLastEntryTemplate = {}
+		self.addr_book = []
+		self.outgoing_channels = {}
+		self.listeningSocket = None
+		self.snapID_table = {}
+		self.done_processes = set()
+
+	def openListeningSocket(self, IP, port):
+		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.listeningSocket.bind( (IP, port) )
+		self.listeningSocket.setblocking(0) 
+		self.listeningSocket.listen(1)
+
+	def addOutgoingChannel(self, dest_id):
+		self.outgoing_channels[dest_id] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+	def openOutgoingChannels(self):
+		time.sleep(5) #To make sure all other processes are up
+		for dest_id, sock in self.outgoing_channels.iteritems():
+			while True:
+				try: 
+					sock.connect(self.addr_book[dest_id - 1])
+					break
+				except Exception:
+					continue
+
+	def addIncomingChannel(self, source_id):
+		self.SnapIDTableLastEntryTemplate[source_id] = [False, 0]
+
+	def openIncomingChannels(self):
+		while len(self.incoming_channels) != len(self.SnapIDTableLastEntryTemplate):
+			try:
+				con, _ = self.listeningSocket.accept()
+				con.setblocking(0)
+				self.incoming_channels.append(con)
+			except socket.error:
+				continue
+
+	def execute(self, command):
+		self.checkIncomingMsgs()
+		keyWords = command.split()
+		if "send" == keyWords[0]:
+			dest_id = int(keyWords[1])
+			amount = int(keyWords[2])
+			self.sendMoney(dest_id, amount)
+		elif "snapshot" == keyWords[0]:
+			self.startSnapshot()
+		elif "sleep" == keyWords[0]:
+			time = float(keyWords[1])
+			self.sleep(time)
+		else:
+			print "CANNOT RECOGNIZE THE COMMAND: " + command
+			exit(1)
+		self.checkIncomingMsgs()
+
+	def checkIncomingMsgs(self):
+		BUF_SIZE = 1024
+		for con in self.incoming_channels:
+			try:
+				msgs = con.recv(BUF_SIZE)
+				for msg in Message.split(msgs):
+					msg = Message.reconstructFromString(msg.strip())
+					if msg.type == Message.MARKER_TYPE:
+						print "Received a MARKER from " + str(msg.source_id)
+						if msg.snap_id not in self.snapID_table: #First Marker -> input into snapID_table
+							counter = 1
+							site_state = self.balance #Take Local State Snapshot
+							incoming_channels_states = copy.deepcopy(self.SnapIDTableLastEntryTemplate)
+							self.snapID_table[msg.snap_id] = [counter, site_state, incoming_channels_states]
+							self.snapID_table[msg.snap_id][2][msg.source_id][0] = True #Shut down the incoming channel of 1st Marker
+							self.sendMarkers(msg.snap_id)
+							if self.snapID_table[msg.snap_id][0] == len(self.incoming_channels): #Received all markers
+								self.outputLocalSnapshotAt(msg.snap_id)
+						else: #Not the first marker
+							self.snapID_table[msg.snap_id][0] += 1 #increase counter by 1
+							self.snapID_table[msg.snap_id][2][msg.source_id][0] = True #Take no more Snapshot on the channel
+							if self.snapID_table[msg.snap_id][0] == len(self.incoming_channels): #Received all markers
+								self.outputLocalSnapshotAt(msg.snap_id)
+					elif msg.type == Message.MONEY_TRANSFER_TYPE: #received a msg
+						print "Received a Money Transfer from " + str(msg.source_id)
+						self.balance += msg.amount #Fix the real-time balance
+						for _, v in self.snapID_table.iteritems():
+							if v[0] == len(self.incoming_channels): #Finished Snapshot
+								continue
+							if v[2][msg.source_id][0] == False: #The current money message is before Marker
+								v[2][msg.source_id][1] += msg.amount #Record the increase in amount
+					elif msg.type == Message.DONE_TYPE:
+						#Piggy back ammount as done_process_id
+						print "Received Done from Site " + str(msg.source_id) + " Originated from Site " + str(msg.amount)
+						done_process_id = msg.amount
+						if done_process_id not in self.done_processes:
+							self.done_processes.add(done_process_id)
+							self.sendDone(done_process_id)
+					else:
+						print "ERROR: DO NOT UNDERSTAND MESSAGE TYPE"
+						print msg
+						exit(1)
+			except socket.error, e:
+				continue
+
+	def outputLocalSnapshotAt(self, snap_id):
+		output = snap_id + ": "
+		output += str(self.snapID_table[snap_id][1]) + " "
+		l = self.snapID_table[snap_id][2].items()
+		sorted(l, key=lambda item: item[0])
+		for _, (_, val) in l:
+			output += str(val) + " "
+		output = output.strip()
+		print "Snapshot Result: " + str(output)
+		del self.snapID_table[snap_id]
+
+	def sendMoney(self, dest_id, amount):
+		print "Sending Money to Site " + str(dest_id)
+		self.balance -= amount
+		msg = Message(self.id, None, amount, Message.MONEY_TRANSFER_TYPE)
+		self.outgoing_channels[dest_id].send(str(msg))
+
+	def sendMarkers(self, snap_id):
+		msg = Message(self.id, snap_id, None, Message.MARKER_TYPE)
+		for dest_id, sock in self.outgoing_channels.iteritems():
+			print "Sending Marker to Site " + str(dest_id) 
+			sock.send(str(msg))
+
+	def sendDone(self, done_process_id):
+		#Piggy Back amount with done_process_id
+		msg = Message(self.id, None, done_process_id, Message.DONE_TYPE)
+		for dest_id, sock in self.outgoing_channels.iteritems():
+			print "Sending Done to Site " + str(dest_id) 
+			sock.send(str(msg))
+
+	def startSnapshot(self):
+		self.snap_count += 1
+		counter = 0
+		snap_id = str(self.id) + "." + str(self.snap_count)
+		site_state = self.balance #Take Local State Snapshot
+		incoming_channels_states = copy.deepcopy(self.SnapIDTableLastEntryTemplate)
+		self.snapID_table[snap_id] = [counter, site_state, incoming_channels_states]
+		self.sendMarkers(snap_id)
+	
+	def sleep(self, amount):
+		count = (amount * 1000)/200
+		i = 0
+		while(i < count):
+			time.sleep(0.2)
+			self.checkIncomingMsgs()
+			i += 1		
+
+	def checkForDone(self):
+		return (self.getUnfinishedSnap() == 0) and (len(self.done_processes) == len(self.addr_book))
+
+	def getUnfinishedSnap(self):
+		#We delete an entry as soon as we're done with its snapchat
+		return len(self.snapID_table)
+	
+	def TearDown(self):
+		print "Shutting Down!"
+		for _, sock in self.outgoing_channels.iteritems():
+			sock.close()
+		for sock in self.incoming_channels:
+			sock.close()
+		self.listeningSocket.close()
+		exit(0)
+
+if __name__ == "__main__":
+	main()

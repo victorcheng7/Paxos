@@ -1,0 +1,4 @@
+#output plaintext
+*.out
+#debug log plaintext
+*.debug
