@@ -46,7 +46,7 @@ def setup(site, setup_file):
 		process_id = 0
 		for line in f.readlines():
 			process_id += 1
-			if process_id <= N:
+			if process_id <= N+1:
 				IP1, port1, IP2, port2 = line.strip().split()
 				port1 = int(port1)
 				port2 = int(port2)
