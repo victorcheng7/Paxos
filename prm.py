@@ -4,60 +4,7 @@ import threading
 import sys
 import Queue
 import copy
- """
-Goal - Simulate algorithm and run through code structure
-Does proposer send to every other node in the network? Or will it have its own quorum?
-
-Reduced file (filename and dictionary inside the log)
-
-Steps to Paxos
-1) Connect with CLI to listen to first command
-2) ***********************************
-Message types:  (Wait 400ms to make sure it didn't actually get majority accept or ack messages)
-1) replicate filename
-2) ***********************************
-Commands: 
-replicate filename, stop/resume... At any point client queries- total, print, merge
-
-Classes: 
-1)	Node
-2)	Log Object
-3)	PRM 
-	a.	BallotNum Tuple <0,0> <Ballot #, ProcessID> Include index of array
-	b.	AcceptNum Tuple <0,0> <AcceptNum #, ProcessID> from ballot
-	c.	AcceptVal Null
-	d.	Array of logs with Log objects
-	e.  id of prm
-Algorithm
-Messages – Prepare, Acknowledge
-	1)	Node 1 sends (“Prepare”, <1,1> ). (msg, ballot) to ALL nodes
-	2)	Node 2 receives (“Prepare”, bal) from  site 1 
-		if(bal >= node.BallotNum):
-			node.BallotNum = bal
-			send("ack", node.BallotNum, node.AcceptNum, AcceptVal) #to node 1
-	3) Node 1 receives ack from Node 2 and now updates counter of joins to 2. KEEP in mind to store all the ack messages,
-		to know all the highest ballot numbered value and use that in your acceptVal message instead.
-		@node1
-		if(counter > total_nodes/2)
-			if(all ack values have AcceptVal as null): 
-				myVal = initial value
-			else:
-				myVal = AcceptVal from ack message that contains highest ballot number.
-			Change your current AcceptVal to 3 and AcceptNum to the one you proposed.
-			send("accept", BallotNum, myVal) to all the nodes #Still a proposal
-	4) Upon accept, check edge case and respond with "success' or "reject"
-	5) If majority accept, send everyone "decide" on certain value. Timeout if not majority accept propose it again with higher ballot #
-	6) Once its original node receives majority of accepts from other nodes, send decide to everyone periodically
-
-Edge cases:
-Every time you send accept message, check to see if ("accept", tempBallNum, AcceptVal) tempBallNum > BallotNum. Ignore 
-if it's less than
-If you didn't receive ack from majority, wait for a random number and send another prepare with higher ballot. timeout
-to see if it did not receive majority acks from the other nodes, 
-
-If node proposes something with index that's already filled, other node send that index onward. Global current_index
-
- """
+ 
 def main():
 	if(len(sys.argv) != 3):
 		print("USAGE: python [prm_id] [setup_file]")
@@ -121,6 +68,55 @@ def setup(site, setup_file):
 	site.openIncomingChannels()
 
 
+class Message(object):
+	PREPARE = 0
+	ACK = 1
+	ACCEPT = 2
+	DECIDE = 3
+	def __init__(self, source_id, ballot_num, accept_num, accept_val, index, type):
+		self.source_id = source_id
+		self.ballot_num = ballot_num
+		self.accept_num = accept_num
+		self.accept_val = accept_val
+		self.index = index
+		self.type = type
+
+	def __str__(self):
+		res = str(self.source_id) + " " + str(self.ballot_num) + " " + str(index) + " " + str(self.type) 
+		if self.accept_num != None:
+			res += " " + str(self.accept_num)
+		if self.accept_val != None: 
+			res += " " + str(self.accept_val)
+		res += "||"
+		return res
+
+	def __repr__(self):
+		return self.__str__()
+
+	@staticmethod
+	def reconstructFromString(str):
+		keyWords = str.strip().split()
+		source_id = int(keyWords[0])
+		ballot_num = keyWords[1]
+		index = int(keyWords[2])
+		msg_type = int(keyWords[3])
+		accept_num = None
+		accept_val = None
+		if msg_type == Message.ACK:
+			accept_num = int(keyWords[4])
+			accept_val = int(keyWords[5])
+		if msg_type == Message.ACCEPT:
+			accept_num = int(keyWords[4]) #this is Done Process ID
+			accept_val = int(keyWords[5])
+		return Message(source_id, ballot_num, accept_num, accept_val, index, msg_type)
+
+	@staticmethod
+	def split(str):
+		res = []
+		for msg in str.strip().split("||"):
+			res.append(msg)
+		del res[-1]
+		return res
 
 class Site(object):
 	def __init__(self, site_id):
