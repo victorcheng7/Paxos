@@ -4,66 +4,12 @@ import threading
 import sys
 import Queue
 import copy
- """
-Goal - Simulate algorithm and run through code structure
-Does proposer send to every other node in the network? Or will it have its own quorum?
-
-Reduced file (filename and dictionary inside the log)
-
-Steps to Paxos
-1) Connect with CLI to listen to first command
-2) ***********************************
-Message types:  (Wait 400ms to make sure it didn't actually get majority accept or ack messages)
-1) replicate filename
-2) ***********************************
-Commands: 
-replicate filename, stop/resume... At any point client queries- total, print, merge
-
-Classes: 
-1)	Node
-2)	Log Object
-3)	PRM 
-	a.	BallotNum Tuple <0,0> <Ballot #, ProcessID> Include index of array
-	b.	AcceptNum Tuple <0,0> <AcceptNum #, ProcessID> from ballot
-	c.	AcceptVal Null
-	d.	Array of logs with Log objects
-	e.  id of prm
-Algorithm
-Messages – Prepare, Acknowledge
-	1)	Node 1 sends (“Prepare”, <1,1> ). (msg, ballot) to ALL nodes
-	2)	Node 2 receives (“Prepare”, bal) from  site 1 
-		if(bal >= node.BallotNum):
-			node.BallotNum = bal
-			send("ack", node.BallotNum, node.AcceptNum, AcceptVal) #to node 1
-	3) Node 1 receives ack from Node 2 and now updates counter of joins to 2. KEEP in mind to store all the ack messages,
-		to know all the highest ballot numbered value and use that in your acceptVal message instead.
-		@node1
-		if(counter > total_nodes/2)
-			if(all ack values have AcceptVal as null): 
-				myVal = initial value
-			else:
-				myVal = AcceptVal from ack message that contains highest ballot number.
-			Change your current AcceptVal to 3 and AcceptNum to the one you proposed.
-			send("accept", BallotNum, myVal) to all the nodes #Still a proposal
-	4) Upon accept, check edge case and respond with "success' or "reject"
-	5) If majority accept, send everyone "decide" on certain value. Timeout if not majority accept propose it again with higher ballot #
-	6) Once its original node receives majority of accepts from other nodes, send decide to everyone periodically
-
-Edge cases:
-Every time you send accept message, check to see if ("accept", tempBallNum, AcceptVal) tempBallNum > BallotNum. Ignore 
-if it's less than
-If you didn't receive ack from majority, wait for a random number and send another prepare with higher ballot. timeout
-to see if it did not receive majority acks from the other nodes, 
-
-If node proposes something with index that's already filled, other node send that index onward. Global current_index
-
- """
 def main():
 	if(len(sys.argv) != 3):
 		print("USAGE: python [prm_id] [setup_file]")
 		exit(1)
-	site_id = int(sys.argv[1])
-	site = Site(site_id)
+	prm_id = int(sys.argv[1])
+	site = Site(prm_id)
 	setup_file = sys.argv[2]
 	setup(site, setup_file)
 	print "success"
@@ -76,26 +22,47 @@ def commThread(site):
 	while finish == 0:
 
 		for con in site.incoming_channels:	
-			try:
-				data = con.recv(1024)
-				print data	
-				if data == "replicate!":
-					for dest_id, sock in site.outgoing_channels.iteritems():
-						sock.send("replicate from node {0}".format(dest_id))
-					
-				elif data == "exit"	:
-					for dest_id, sock in site.outgoing_channels.iteritems():
-						sock.send("exit")
-					finish = 1
-			except socket.error, e:
-				continue
+			receiveFromPrm(con)
+
+		receiveFromCli(site.cli[1])
+
+
+def receiveFromPrm(con):
+	try:
+		data = con.recv(1024)
+		print data	
+			
+		if data == "exit":
+			for dest_id, sock in site.outgoing_channels.iteritems():
+					sock.send("exit")
+			finish = 1
+	except socket.error, e:
+		pass
+
+
+def receiveFromCli(con):
+	try:
+		data = con.recv(1024)
+		print data	
+		if data == "replicate!":
+			for dest_id, sock in site.outgoing_channels.iteritems():
+					sock.send("replicate from prm with id {0}".format(site.id))
+			
+		elif data == "exit"	:
+			for dest_id, sock in site.outgoing_channels.iteritems():
+				if dest_id != site.id:
+					sock.send("exit")
+			finish = 1
+	except socket.error, e:
+		pass
+
 
 def setup(site, setup_file):
 	#Read setup file. ex - setup.txt  
 	print "gothere"   
 	with open(setup_file, 'r') as f:
 		N = int(f.readline().strip())
-		site.num_proc = N
+		site.num_nodes = N
 		process_id = 0
 		for line in f.readlines():
 			process_id += 1
@@ -105,14 +72,16 @@ def setup(site, setup_file):
 				port2 = int(port2)
 
 				if process_id == site.id:
+					site.cli[0] = (IP1, port1)
 					site.addr_book.append( (IP1, port1) )
 					site.openListeningSocket( IP2, port2) #open for traffic
 
 				else:
 					site.addr_book.append( (IP2, port2) )
+					site.addOutgoingChannel(process_id)
+					site.addIncomingChannel(process_id)
 
-				site.addOutgoingChannel(process_id)
-				site.addIncomingChannel(process_id)
+				
 
 	print site.outgoing_channels
 	print site.incoming_channels
@@ -120,6 +89,38 @@ def setup(site, setup_file):
 	print "am"
 	site.openIncomingChannels()
 
+	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	site.cli[1] = sock
+	while True:
+		try: 
+			sock.connect(site.cli[0])
+			print "connected to cli"
+			break
+		except Exception:
+			continue
+
+
+	while True:
+		try:
+
+			con, addr = site.listeningSocket.accept()
+			con.setblocking(0)
+
+			# if addr == site.cli[0]:
+			site.cli[2] = con
+			print "connected to cli2"
+			break
+		except socket.error:
+			continue
+
+
+	print "hello"
+	print site.cli[0]
+	print site.cli[1]
+	print site.cli[2]
+
+	# # remove cli from outgoing channels
+	# site.outgoing_channels.pop(site.id, None)
 
 
 class Site(object):
@@ -133,12 +134,16 @@ class Site(object):
 		self.addr_book = []
 		self.outgoing_channels = {}
 		self.listeningSocket = None
+		self.cli = [None]*3 # cli[0] = addr cli[1] = incoming, cli[2] = outgoing
 		self.snapID_table = {}
 		self.done_processes = set()
 
+
 	def openListeningSocket(self, IP, port):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.listeningSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.listeningSocket.bind( (IP, port) )
+
 		self.listeningSocket.setblocking(0) 
 		self.listeningSocket.listen(1)
 
@@ -154,19 +159,26 @@ class Site(object):
 					break
 				except Exception:
 					continue
+		# self.cli[2] = self.outgoing_channels[self.id]
 
 	def addIncomingChannel(self, source_id):
 		self.SnapIDTableLastEntryTemplate[source_id] = [False, 0]
 
 	def openIncomingChannels(self):
 		while len(self.incoming_channels) != len(self.SnapIDTableLastEntryTemplate):
+			
 			try:
-				con, _ = self.listeningSocket.accept()
+
+				con, addr = self.listeningSocket.accept()
 				con.setblocking(0)
+				# if addr == self.cli[0]:
+				# 	# self.cli[1] = con
+				# else:
 				self.incoming_channels.append(con)
 			except socket.error:
 				continue
 
+		print "terminate"
 	def execute(self, command):
 		self.checkIncomingMsgs()
 		keyWords = command.split()

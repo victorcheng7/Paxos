@@ -23,10 +23,13 @@ def main():
 	cThread.daemon = True
 	cThread.start()
 
+	print "printing incoming"
+	print cli.incomingStream
 	while True:
 		command = raw_input()
 
 		if command == "replicate":
+			print "rep"
 			cli.outgoingSocket.send("replicate!")
 
 
@@ -87,6 +90,8 @@ def setup(machine, setup_file):
 						sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 						sock.connect(machine.prm)
 						machine.outgoingSocket = sock
+						print "hl"
+						print machine.outgoingSocket
 						break
 					except Exception:
 						continue
@@ -140,6 +145,7 @@ class Machine(object):
 
 	def openListeningSocket(self, IP, port):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.listeningSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.listeningSocket.bind( (IP, port) )
 		self.listeningSocket.setblocking(0) 
 		self.listeningSocket.listen(10)
