@@ -4,7 +4,51 @@ import threading
 import sys
 import Queue
 import copy
+ """
+Goal - Simulate algorithm and run through code structure
+Does proposer send to every other node in the network? Or will it have its own quorum?
 
+Array of logs, Reduced file (filename and dictionary inside the log)
+CLI file that will ask PRM for log array 
+
+Classes: 
+1)	Node
+2)	Log 
+3)	PRM 
+	a.	BallotNum Tuple <0,0> <Ballot #, ProcessID> Include index of array
+	b.	AcceptNum Tuple <0,0> <AcceptNum #, ProcessID> from ballot
+	c.	AcceptVal Null
+	d.	Log object
+Algorithm
+Messages – Prepare, Acknowledge
+	1)	Node 1 sends (“Prepare”, <1,1> ). (msg, ballot) to ALL nodes
+	2)	Node 2 receives (“Prepare”, bal) from  site 1 
+		if(bal >= node.BallotNum):
+			node.BallotNum = bal
+			send("ack", node.BallotNum, node.AcceptNum, AcceptVal) #to node 1
+	3) Node 1 receives ack from Node 2 and now updates counter of joins to 2. KEEP in mind to store all the ack messages,
+		to know all the highest ballot numbered value and use that in your acceptVal message instead.
+		@node1
+		if(counter > total_nodes/2)
+			if(all ack values have AcceptVal as null): 
+				myVal = initial value
+			else:
+				myVal = AcceptVal from ack message that contains highest ballot number.
+			Change your current AcceptVal to 3 and AcceptNum to the one you proposed.
+			send("accept", BallotNum, myVal) to all the nodes #Still a proposal
+	4) Upon accept, check edge case and respond with "success' or "reject"
+	5) If majority accept, send everyone "decide" on certain value. Timeout if not majority accept propose it again with higher ballot #
+	6) Once its original node receives majority of accepts from other nodes, send decide to everyone periodically
+
+Edge cases:
+Every time you send accept message, check to see if ("accept", tempBallNum, AcceptVal) tempBallNum > BallotNum. Ignore 
+if it's less than
+If you didn't receive ack from majority, wait for a random number and send another prepare with higher ballot. timeout
+to see if it did not receive majority acks from the other nodes, 
+
+If node proposes something with index that's already filled, other node send that index onward. Global current_index
+
+ """
 def main():
 	if(len(sys.argv) != 3):
 		print("USAGE: python [prm_id] [setup_file]")
