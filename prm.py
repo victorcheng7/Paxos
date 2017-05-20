@@ -8,17 +8,26 @@ import copy
 Goal - Simulate algorithm and run through code structure
 Does proposer send to every other node in the network? Or will it have its own quorum?
 
-Array of logs, Reduced file (filename and dictionary inside the log)
-CLI file that will ask PRM for log array 
+Reduced file (filename and dictionary inside the log)
+
+Steps to Paxos
+1) Connect with CLI to listen to first command
+2) ***********************************
+Message types:  (Wait 400ms to make sure it didn't actually get majority accept or ack messages)
+1) replicate filename
+2) ***********************************
+Commands: 
+replicate filename, stop/resume... At any point client queries- total, print, merge
 
 Classes: 
 1)	Node
-2)	Log 
+2)	Log Object
 3)	PRM 
 	a.	BallotNum Tuple <0,0> <Ballot #, ProcessID> Include index of array
 	b.	AcceptNum Tuple <0,0> <AcceptNum #, ProcessID> from ballot
 	c.	AcceptVal Null
-	d.	Log object
+	d.	Array of logs with Log objects
+	e.  id of prm
 Algorithm
 Messages – Prepare, Acknowledge
 	1)	Node 1 sends (“Prepare”, <1,1> ). (msg, ballot) to ALL nodes
