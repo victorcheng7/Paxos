@@ -44,6 +44,8 @@ def main():
 		elif command == "exit":
 			cli.outgoingSocket.send("exit")
 			break
+		else: 
+			print "Sorry cannot recognize command"
 	# execute_commands(site, command_file)
 
 def commThread():

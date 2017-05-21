@@ -21,9 +21,8 @@ def commThread(site):
 	while finish == 0:
 		#CLI connect
 		try:
-			print "inside of here"
 			con = site.cli[1]
-			print con
+			print "This should be printed out infinitely, but it's not"
 			data = con.recv(1024)
 			print data	
 			if data == "replicate!":
