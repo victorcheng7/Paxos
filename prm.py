@@ -12,7 +12,6 @@ def main():
 	site = Site(prm_id)
 	setup_file = sys.argv[2]
 	setup(site, setup_file)
-	print "success"
 	commThread(site)
 
 
@@ -20,13 +19,41 @@ def commThread(site):
 
 	finish = 0
 	while finish == 0:
+		#CLI connect
+		try:
+			print "inside of here"
+			con = site.cli[1]
+			print con
+			data = con.recv(1024)
+			print data	
+			if data == "replicate!":
+				for dest_id, sock in site.outgoing_channels.iteritems():
+						sock.send("replicate from prm with id {0}".format(site.id))
+				
+			elif data == "exit"	:
+				for dest_id, sock in site.outgoing_channels.iteritems():
+					if dest_id != site.id:
+						sock.send("exit")
+				finish = 1
+		except socket.error, e:
+			print "There's an error"
+			continue
 
 		for con in site.incoming_channels:	
-			receiveFromPrm(con)
+			try:
+				data = con.recv(1024)
+				print data	
+			
+				if data == "exit":
+					for dest_id, sock in site.outgoing_channels.iteritems():
+						sock.send("exit")
+					finish = 1
+			except socket.error, e:
+				continue
+	
+		#receiveFromCli(site.cli[1])
 
-		receiveFromCli(site.cli[1])
-
-
+'''
 def receiveFromPrm(con):
 	try:
 		data = con.recv(1024)
@@ -37,13 +64,12 @@ def receiveFromPrm(con):
 					sock.send("exit")
 			finish = 1
 	except socket.error, e:
-		pass
+		continue
 
 
 def receiveFromCli(con):
 	try:
-		data = con.recv(1024)
-		print data	
+		data = con.recv(1024)	
 		if data == "replicate!":
 			for dest_id, sock in site.outgoing_channels.iteritems():
 					sock.send("replicate from prm with id {0}".format(site.id))
@@ -55,11 +81,10 @@ def receiveFromCli(con):
 			finish = 1
 	except socket.error, e:
 		pass
-
+'''
 
 def setup(site, setup_file):
 	#Read setup file. ex - setup.txt  
-	print "gothere"   
 	with open(setup_file, 'r') as f:
 		N = int(f.readline().strip())
 		site.num_nodes = N
@@ -83,10 +108,7 @@ def setup(site, setup_file):
 
 				
 
-	print site.outgoing_channels
-	print site.incoming_channels
 	site.openOutgoingChannels()
-	print "am"
 	site.openIncomingChannels()
 
 	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -94,7 +116,6 @@ def setup(site, setup_file):
 	while True:
 		try: 
 			sock.connect(site.cli[0])
-			print "connected to cli"
 			break
 		except Exception:
 			continue
@@ -108,17 +129,11 @@ def setup(site, setup_file):
 
 			# if addr == site.cli[0]:
 			site.cli[2] = con
-			print "connected to cli2"
 			break
 		except socket.error:
 			continue
 
-
-	print "hello"
-	print site.cli[0]
-	print site.cli[1]
-	print site.cli[2]
-
+	print "finished setup"
 	# # remove cli from outgoing channels
 	# site.outgoing_channels.pop(site.id, None)
 
@@ -178,7 +193,6 @@ class Site(object):
 			except socket.error:
 				continue
 
-		print "terminate"
 	def execute(self, command):
 		self.checkIncomingMsgs()
 		keyWords = command.split()

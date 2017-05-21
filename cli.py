@@ -23,13 +23,12 @@ def main():
 	cThread.daemon = True
 	cThread.start()
 
-	print "printing incoming"
-	print cli.incomingStream
 	while True:
 		command = raw_input()
 
 		if command == "replicate":
 			print "rep"
+			print cli.outgoingSocket
 			cli.outgoingSocket.send("replicate!")
 
 
@@ -51,17 +50,7 @@ def commThread():
 
 	while True:
 		try:
-			con, _ = cli.listeningSocket.accept()
-			con.setblocking(0)
-			cli.incomingStream = con
-			break
-		except socket.error:
-			continue
-
-	while True:
-		try:
 			data = cli.incomingStream.recv(1024)
-			print data		
 		except socket.error, e:
 			continue
 
@@ -83,23 +72,27 @@ def setup(machine, setup_file):
 
 
 				machine.openListeningSocket(IP1, port1)
-				print "got here!"
 				# connect to prm
 				while True:
 					try: 
 						sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 						sock.connect(machine.prm)
 						machine.outgoingSocket = sock
-						print "hl"
-						print machine.outgoingSocket
+						
 						break
 					except Exception:
 						continue
-				print "got here!"
 
 				
 
-
+	while True:
+		try:
+			con, _ = cli.listeningSocket.accept()
+			con.setblocking(0)
+			cli.incomingStream = con
+			break
+		except socket.error:
+			continue
 
 
 			# if process_id <= N:
