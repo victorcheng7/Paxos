@@ -14,7 +14,18 @@ def main():
 	setup_file = sys.argv[2]
 	setup(site, setup_file)
 	print "success"
-	commThread(site)
+
+	cThread = threading.Thread(target = commThread, args=(site,))
+	cThread.daemon = True
+	cThread.start()
+
+	#site.checkIncomingChannels
+
+	# Do all the paxos protocol related stuff
+
+	#commThread(site)
+
+	#assume that all connections are there prm and cli connections
 
 
 def commThread(site):
@@ -46,7 +57,7 @@ def setup(site, setup_file):
 		process_id = 0
 		for line in f.readlines():
 			process_id += 1
-			if process_id <= N+1:
+			if process_id <= N+2:
 				IP1, port1, IP2, port2 = line.strip().split()
 				port1 = int(port1)
 				port2 = int(port2)
@@ -131,6 +142,7 @@ class Site(object):
 		self.listeningSocket = None
 		self.snapID_table = {}
 		self.done_processes = set()
+		self.ballot = (None, None)
 
 	def openListeningSocket(self, IP, port):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -186,7 +198,26 @@ class Site(object):
 			try:
 				msgs = con.recv(BUF_SIZE)
 				for msg in Message.split(msgs):
+
 					msg = Message.reconstructFromString(msg.strip())
+					'''
+					PREPARE = 0
+	ACK = 1
+	ACCEPT = 2
+	DECIDE = 3
+	def __init__(self, source_id, ballot_num, accept_num, accept_val, index, type):
+		self.source_id = source_id
+		self.ballot_num = ballot_num
+		self.accept_num = accept_num
+		self.accept_val = accept_val
+		self.index = index
+		self.type = type
+					if msg.type === Message.PREPARE:
+						
+					
+
+
+					'''
 					if msg.type == Message.MARKER_TYPE:
 						if msg.snap_id not in self.snapID_table: #First Marker -> input into snapID_table
 							counter = 1
