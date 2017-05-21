@@ -19,6 +19,8 @@ def main():
 	cThread.daemon = True
 	cThread.start()
 
+	while True:
+		pass
 	#site.checkIncomingChannels
 
 	# Do all the paxos protocol related stuff
@@ -53,7 +55,7 @@ def setup(site, setup_file):
 	print "gothere"   
 	with open(setup_file, 'r') as f:
 		N = int(f.readline().strip())
-		site.num_proc = N
+		site.num_nodes = N
 		process_id = 0
 		for line in f.readlines():
 			process_id += 1
@@ -142,7 +144,14 @@ class Site(object):
 		self.listeningSocket = None
 		self.snapID_table = {}
 		self.done_processes = set()
-		self.ballot = (None, None)
+
+		self.num_nodes = 0
+		self.numAccepts = 0
+		self.numAcks = 0
+		self.ballotTuple = (None, None)
+		self.acceptTuple = (None, None)
+		self.acceptVal = 0
+		self.logs = []
 
 	def openListeningSocket(self, IP, port):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
