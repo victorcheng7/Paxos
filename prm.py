@@ -155,6 +155,7 @@ class Site(object):
 
 	def openListeningSocket(self, IP, port):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.listeningSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.listeningSocket.bind( (IP, port) )
 		self.listeningSocket.setblocking(0) 
 		self.listeningSocket.listen(1)
