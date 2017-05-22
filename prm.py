@@ -34,21 +34,29 @@ def commThread(site):
 
 	finish = 0
 	while finish == 0:
-
+		incomingChannelIndex = 0
 		for con in site.incoming_channels:	
 			try:
 				data = con.recv(1024)
 				print data	
-				if data == "replicate!":
-					for dest_id, sock in site.outgoing_channels.iteritems():
-						sock.send("replicate from node {0}".format(dest_id))
-					
-				elif data == "exit"	:
-					for dest_id, sock in site.outgoing_channels.iteritems():
-						sock.send("exit")
-					finish = 1
+				if incomingChannelIndex+1 == site.id:
+					if data == "replicate!":
+						for dest_id, sock in site.outgoing_channels.iteritems():
+							#sock.send("replicate from node {0}".format(dest_id))
+							site.sendProposal(dest_id, site.id)
+					elif data == "exit"	:
+						for dest_id, sock in site.outgoing_channels.iteritems():
+							sock.send("exit")
+						finish = 1
+
+				else:
+					for msg in Message.split(data):
+						msg = Message.reconstructFromString(msg.strip())
+						if msg.type == Message.PREPARE:
+							print msg
 			except socket.error, e:
 				continue
+			incomingChannelIndex += 1
 
 def setup(site, setup_file):
 	#Read setup file. ex - setup.txt  
@@ -80,26 +88,31 @@ def setup(site, setup_file):
 	print "am"
 	site.openIncomingChannels()
 
+class Ballot(object):
+	def __init__(self, ballot1, ballot2):
+		self.ballot1 = ballot1
+		self.ballot2 = ballot2
+
 
 class Message(object):
 	PREPARE = 0
 	ACK = 1
 	ACCEPT = 2
 	DECIDE = 3
-	def __init__(self, source_id, ballot_num, accept_num, accept_val, index, type):
+	def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, type):
 		self.source_id = source_id
-		self.ballot_num = ballot_num
-		self.accept_num = accept_num
-		self.accept_val = accept_val
+		self.ballot = ballot
+		self.acceptTuple = acceptTuple
+		self.acceptVal = acceptVal
 		self.index = index
 		self.type = type
 
 	def __str__(self):
-		res = str(self.source_id) + " " + str(self.ballot_num) + " " + str(index) + " " + str(self.type) 
-		if self.accept_num != None:
-			res += " " + str(self.accept_num)
-		if self.accept_val != None: 
-			res += " " + str(self.accept_val)
+		res = str(self.source_id) + " " + str(self.ballot) + " " + str(self.index) + " " + str(self.type) 
+		if self.acceptTuple != None:
+			res += " " + str(self.acceptTuple)
+		if self.acceptVal != None: 
+			res += " " + str(self.acceptVal)
 		res += "||"
 		return res
 
@@ -110,18 +123,18 @@ class Message(object):
 	def reconstructFromString(str):
 		keyWords = str.strip().split()
 		source_id = int(keyWords[0])
-		ballot_num = keyWords[1]
+		ballotTuple = keyWords[1]
 		index = int(keyWords[2])
 		msg_type = int(keyWords[3])
-		accept_num = None
-		accept_val = None
+		acceptTuple = None
+		acceptVal = None
 		if msg_type == Message.ACK:
-			accept_num = int(keyWords[4])
-			accept_val = int(keyWords[5])
+			acceptTuple = int(keyWords[4])
+			acceptVal = int(keyWords[5])
 		if msg_type == Message.ACCEPT:
-			accept_num = int(keyWords[4]) #this is Done Process ID
-			accept_val = int(keyWords[5])
-		return Message(source_id, ballot_num, accept_num, accept_val, index, msg_type)
+			acceptTuple = int(keyWords[4]) #this is Done Process ID
+			acceptVal = int(keyWords[5])
+		return Message(source_id, ballotTuple, acceptTuple, acceptVal, index, msg_type)
 
 	@staticmethod
 	def split(str):
@@ -148,9 +161,10 @@ class Site(object):
 		self.num_nodes = 0
 		self.numAccepts = 0
 		self.numAcks = 0
-		self.ballotTuple = (None, None)
-		self.acceptTuple = (None, None)
-		self.acceptVal = 0
+		self.ballot = Ballot(0, site_id)
+		#self.ballotTuple = [0, site_id]
+		self.acceptTuple = [0, site_id]
+		self.acceptVal = ""
 		self.logs = []
 
 	def openListeningSocket(self, IP, port):
@@ -201,32 +215,64 @@ class Site(object):
 			exit(1)
 		self.checkIncomingMsgs()
 
+
+	def sendProposal(self, dest_id, site_id):
+			#def __init__(self, source_id, ballotTuple, acceptTuple, acceptVal, index, type):
+		self.ballot[0] += 1
+		msg = Message(self.id, self.ballot, None, None, len(self.logs), Message.PREPARE)
+		self.outgoing_channels[dest_id].send(str(msg))
+		'''
+			def __init__(self, source_id, ballot_num, accept_num, accept_val, index, type):
+			self.num_nodes = 0
+				self.numAccepts = 0
+				self.numAcks = 0
+				self.ballotTuple = (0, 0)
+				self.acceptTuple = (0, 0)
+				self.acceptVal = 0
+				self.logs = []
+
+			PREPARE = 0
+			ACK = 1
+			ACCEPT = 2
+			DECIDE = 3
+			def __init__(self, source_id, ballot_num, accept_num, accept_val, index, type):
+				self.source_id = source_id
+				self.ballot_num = ballot_num
+				self.accept_num = accept_num
+				self.accept_val = accept_val
+				self.index = index
+				self.type = type
+						if msg.type === Message.PREPARE:
+		'''
+
+	def sendMarkers(self, snap_id):
+		msg = Message(self.id, snap_id, None, Message.MARKER_TYPE)
+		for dest_id, sock in self.outgoing_channels.iteritems():
+			sock.send(str(msg))
+
+	def sendDone(self, done_process_id):
+		#Piggy Back amount with done_process_id
+		msg = Message(self.id, None, done_process_id, Message.DONE_TYPE)
+		for dest_id, sock in self.outgoing_channels.iteritems():
+			sock.send(str(msg))
+
+	def startSnapshot(self):
+		self.snap_count += 1
+		counter = 0
+		snap_id = str(self.id) + "." + str(self.snap_count)
+		site_state = self.balance #Take Local State Snapshot
+		incoming_channels_states = copy.deepcopy(self.SnapIDTableLastEntryTemplate)
+		self.snapID_table[snap_id] = [counter, site_state, incoming_channels_states]
+		self.sendMarkers(snap_id)
+
+
 	def checkIncomingMsgs(self):
 		BUF_SIZE = 1024
 		for con in self.incoming_channels:
 			try:
 				msgs = con.recv(BUF_SIZE)
 				for msg in Message.split(msgs):
-
 					msg = Message.reconstructFromString(msg.strip())
-					'''
-					PREPARE = 0
-	ACK = 1
-	ACCEPT = 2
-	DECIDE = 3
-	def __init__(self, source_id, ballot_num, accept_num, accept_val, index, type):
-		self.source_id = source_id
-		self.ballot_num = ballot_num
-		self.accept_num = accept_num
-		self.accept_val = accept_val
-		self.index = index
-		self.type = type
-					if msg.type === Message.PREPARE:
-						
-					
-
-
-					'''
 					if msg.type == Message.MARKER_TYPE:
 						if msg.snap_id not in self.snapID_table: #First Marker -> input into snapID_table
 							counter = 1
