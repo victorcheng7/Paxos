@@ -9,11 +9,11 @@ def main():
 	if(len(sys.argv) != 3):
 		print("USAGE: python [prm_id] [setup_file]")
 		exit(1)
-	site_id = int(sys.argv[1])
-	site = Site(site_id)
+	prm_id = int(sys.argv[1])
+	prm = Prm(prm_id)
 	setup_file = sys.argv[2]
-	setup(site, setup_file)
-	print "success"
+	setup(prm, setup_file)
+	print "Setup success"
 
 	cThread = threading.Thread(target = commThread, args=(site,))
 	cThread.daemon = True
@@ -144,7 +144,7 @@ class Message(object):
 		del res[-1]
 		return res
 
-class Site(object):
+class Prm(object):
 	def __init__(self, site_id):
 		self.id = site_id
 		self.snap_count = 0
