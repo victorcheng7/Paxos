@@ -29,10 +29,8 @@ def main():
 	print "I am cli {0}".format(cli_id)
 	while True:
 		command = raw_input()
-
 		if command == "replicate":
 			cli.outgoingSocket.send("replicate!")
-
 
 		elif command == "map":
 			print "map"
