@@ -4,7 +4,115 @@ import threading
 import sys
 import Queue
 import copy
- 
+ '''
+States i need to add - stop/resume, replicate 
+
+Questions - when should you propose another Prepare ballot number again? not majority in accept or prepare round
+
+ if replicate:
+ 	prm.proposedFile = the second part of the replicate message that was validated by CLI
+ 	prm.ballot[0] += 1 #change ballot number
+ 	send all prms Message(prm.ballot, prm.id, index, "PREPARE")
+ 	TODO ORIGINAL PRM SHOULD BE LISTENING TO MAJORITY OF ACKNOWLEDGEMENTS, IF NOT REPROPOSE
+idea 1- 
+if stop: 
+	tear down all incoming channels, so you can only listen to cmds from CLI
+if resume: 
+	reestablish all connections
+idea 2 - 
+if stop: 
+	Add an extra if statement validation on resume/stop state of PRM on commThread()
+	Any message taken in, don't do anything 
+if resume: 
+	resume as normal inside of commThread
+	if state = replicate: 
+		send proposal to everyone 
+	if state != replicate: 
+		upon receiving a proposal, if index they're proposing > last index in ur array, ask that node for updates
+
+if total, print, merge EASY: 
+	add up total words inside each files 
+
+
+Message types:  (Wait 400ms to make sure it didn't actually get majority accept or ack messages)
+5) Decide, index in log array, Accept value
+6) Add a update and isupdate message so you can let the down nodes know
+Upon receiving Decide message, check the index in the array and if there are empty entries before it
+if there are, ask the source_id of the decide message if they could send you all previous indexes
+
+if Prepare: 
+	if msg.ballotTuple > prm.ballotTuple:
+		if index of proposal > len(prm.log):
+			ask that source_id for your missing entries in log
+		if index of proposal < len(prm.log): 
+			update the source_id all the entries in the log before the proposal
+		prm.ballotTuple = msg.ballotTuple
+		send Ack(prm.id, prm.ballotTuple, acceptTuple, acceptVal, index, ACK) to original preparer
+if Ack: 
+	Keep track array of array of ACK messages objects
+	prm.numAcks += 1
+	if len(ackarray) > upper(0.5*prm.num_nodes):
+		tempAcceptTuple = [None, None] #message with the highest acceptTuple
+		tempAcceptVal = None #acceptVal with the highest acceptTuple
+		isValue = false
+		for ACK messages array: 
+			check if there are any messages that contains acceptVal 
+			if there are:
+				isValue = true
+				#max of acceptTuple for ACK messages array, 
+				tempAcceptTuple = msg with highest acceptTuple.acceptTuple 
+				tempAcceptVal = msg with highest acceptTuple.acceptVal    
+
+		if counter == 0:
+			prm.acceptTuple = prm.ballotTuple
+			prm.acceptVal = prm.proposedFile
+		else: 
+			prm.acceptTuple = tempAcceptTuple
+			prm.acceptVal = tempAcceptVal
+		for all outgoing channels:
+			send(prm.id, prm.ballotTuple, prm.acceptTuple, prm.acceptVal, prm.index, originalPRM, "ACCEPT")
+			TODO ORIGINAL PRM SHOULD BE LISTENING FOR ACCEPTS FROM MAJORITY IF NOT REPROPOSE
+if ACCEPT: 
+	if msg.index > len(prm.log): 
+		send("Update") to the source_id of the prm to send back all the missing indexes in my log
+	if msg.ballot >= prm.ballotTuple: 
+		prm.acceptTuple = msg.acceptTuple 
+		prm.acceptVal = msg.acceptVal
+		for all outgoing channels:
+			send(prm.id, prm.ballotTuple, None, prm.acceptVal, prm.index, "ACCEPT")
+
+		if msg.originalPRM == prm.id: 
+			prm.numAccepts += 1
+		if prm.numAccepts >= upper(prm.num_nodes/2): 
+			log[msg.index] = prm.proposedFile
+			for all outgoing channels: 
+				send("DECIDE")...................
+				TODO periodically send out decide messages to everyone
+	
+
+if UPDATE: #send that source the updated log if they are missing anything
+	TODO
+
+TODO check when you should update the log that needs it
+
+	After paxos is over, reset 
+		self.numAccepts = 1
+		self.numAcks = 1
+		self.ballot = Ballot(0, site_id)
+		#self.ballotTuple = [0, site_id]
+		self.acceptTuple = [0, site_id]
+		self.acceptVal = ""
+
+		self.proposedFile = None
+		self.num_nodes = 0
+		self.numAccepts = 0
+		self.numAcks = 0
+		self.ballot = Ballot(0, site_id)
+		#self.ballotTuple = [0, site_id]
+		self.acceptTuple = [0, site_id]
+		self.acceptVal = ""
+		self.logs = []
+ '''
 def main():
 	if(len(sys.argv) != 3):
 		print("USAGE: python [prm_id] [setup_file]")
@@ -99,12 +207,13 @@ class Message(object):
 	ACK = 1
 	ACCEPT = 2
 	DECIDE = 3
-	def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, type):
+	def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, type):
 		self.source_id = source_id
 		self.ballot = ballot
 		self.acceptTuple = acceptTuple
 		self.acceptVal = acceptVal
 		self.index = index
+		self.originalPRM = originalPRM
 		self.type = type
 
 	def __str__(self):
@@ -113,6 +222,8 @@ class Message(object):
 			res += " " + str(self.acceptTuple)
 		if self.acceptVal != None: 
 			res += " " + str(self.acceptVal)
+		if self.originalPRM != None:
+			res += " " + str(self.originalPRM)
 		res += "||"
 		return res
 
@@ -131,10 +242,12 @@ class Message(object):
 		if msg_type == Message.ACK:
 			acceptTuple = int(keyWords[4])
 			acceptVal = int(keyWords[5])
+			originalPRM = int(keyWords[6])
 		if msg_type == Message.ACCEPT:
 			acceptTuple = int(keyWords[4]) #this is Done Process ID
 			acceptVal = int(keyWords[5])
-		return Message(source_id, ballotTuple, acceptTuple, acceptVal, index, msg_type)
+			originalPRM = int(keyWords[6])
+		return Message(source_id, ballotTuple, acceptTuple, acceptVal, index, originalPRM, msg_type)
 
 	@staticmethod
 	def split(str):
@@ -158,13 +271,14 @@ class Prm(object):
 		self.snapID_table = {}
 		self.done_processes = set()
 
+		self.proposedFile = None
 		self.num_nodes = 0
-		self.numAccepts = 0
-		self.numAcks = 0
+		self.numAccepts = 1
+		self.numAcks = 1
 		self.ballot = Ballot(0, site_id)
 		#self.ballotTuple = [0, site_id]
-		self.acceptTuple = [0, site_id]
-		self.acceptVal = ""
+		self.acceptTuple = [None, None]
+		self.acceptVal = None
 		self.logs = []
 
 	def openListeningSocket(self, IP, port):
