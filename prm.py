@@ -6,12 +6,16 @@ import Queue
 import copy
 
 '''
-*******************
-TODO 
-States i need to add to PRM - stop/resume, replicate 
+******************* 
+To help debug, print out every receive and send message and who you're sending to
+States I need to add to PRM - stop/resume, send update messages to all outgoing
 
-Questions - How do I detect majority accept/ack or Not? (Wait 400ms to make sure it didn't actually get majority accept or ack messages)
-Think about communication with CLI from PRM 
+TODO
+make a modular function that loops through and sends all the relevant log entries one by one
+make a modular function that does a timeout and checks to see if you have majority
+1) accept 2) acknowledge
+Problem - How do I detect majority accept/ack or Not? 
+(Wait 400ms to make sure it didn't actually get majority accept or ack messages, time.sleep random # before reprposing)
 *******************
  if replicate:
     prm.proposedFile = the second part of the replicate message that was validated by CLI
@@ -40,21 +44,23 @@ if total, print, merge EASY:
 
 
 if Prepare: 
+	if msg.index < prm.index: 
+		send("update", log entries and corresponding index) to msg.source_id
     if msg.ballotTuple > prm.ballotTuple:
         if index of proposal > prm.index:
             ask that source_id for your missing entries in log
         if index of proposal < prm.index: 
             update the source_id all the entries in the log before the proposal
         prm.ballotTuple = msg.ballotTuple
-        send Ack(prm.id, prm.ballotTuple, acceptTuple, acceptVal, index, ACK) to original preparer
+        send Ack(prm.id, prm.ballotTuple, acceptTuple, acceptVal, index, msg.originalPRM ACK) to original preparer
 if Ack: 
     Keep track array of array of ACK messages objects
-    prm.numAcks += 1
-    if len(ackarray) > upper(0.5*prm.num_nodes):
+    prm.ackArray.append(msg)
+    if len(prm.ackarray) + 1 > upper(0.5*prm.num_nodes):
         tempAcceptTuple = [None, None] #message with the highest acceptTuple
         tempAcceptVal = None #acceptVal with the highest acceptTuple
         isValue = false
-        for ACK messages array: 
+        for msgs messages prm.ackArray: 
             check if there are any messages that contains acceptVal 
             if there are:
                 isValue = true
@@ -71,25 +77,23 @@ if Ack:
         for all outgoing channels:
             send(prm.id, prm.ballotTuple, prm.acceptTuple, prm.acceptVal, prm.index, originalPRM, "ACCEPT")
             TODO ORIGINAL PRM SHOULD BE LISTENING FOR ACCEPTS FROM MAJORITY IF NOT REPROPOSE
+
 if ACCEPT: 
     if msg.index > prm.index: 
-        		send(prm.id, None, None, None, None, None, None, "UPDATE") #Ask for entire log
+       	send(prm.id, None, None, None, None, None, None, "UPDATE") #Ask for entire log
     if msg.ballot >= prm.ballotTuple: 
         prm.acceptTuple = msg.acceptTuple 
         prm.acceptVal = msg.acceptVal
         for all outgoing channels:
             send(prm.id, prm.ballotTuple, None, prm.acceptVal, prm.index,  "ACCEPT")
-
         if msg.originalPRM == prm.id: 
             prm.numAccepts += 1
         if prm.numAccepts >= upper(prm.num_nodes/2): 
             log[msg.index] = prm.proposedFile
             for all outgoing channels: 
                 send(prm.id, None, None, prm.proposedFile, prm.index, msg.originalPRM, None, "DECIDE")
-                TODO periodically send out decide messages to everyone
+            send("finished with replicate and your file successfully added to log") to CLI
     
-	def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, type):
-
 if DECIDE: 
 	if msg.index > prm.index:
 		send(prm.id, prm.index, "UPDATE") to msg.originalPRM
@@ -105,7 +109,7 @@ if UPDATE:
 			send(prm.id, counter, prm.log[counter], "UPDATE") to msg.source_id #send a bunch of corresponding log entries
 	elif (msg.index > prm.index) and (msg.log != None):
 		#please update me
-		prm.log[msg.index] = msg.log 
+		prm.log[msg.index] = msg.log 			
 '''
 
 def main():
@@ -297,12 +301,11 @@ class Prm(object):
 		self.proposedFile = None
 		self.num_nodes = 0
 		self.numAccepts = 1
-		self.numAcks = 1
-		self.ballot = Ballot(0, site_id)
-		#self.ballotTuple = [0, site_id]
+		self.ballotTuple = [0, site_id]
 		self.acceptTuple = [None, None]
 		self.acceptVal = None
 		self.index = 0
+		self.ackArray = []
 		self.log = []
 	def newRoundCleanUp(self):
 		self.proposedFile = None
@@ -312,6 +315,7 @@ class Prm(object):
 		#self.ballotTuple = [0, site_id]
 		self.acceptTuple = [None, None]
 		self.acceptVal = None
+		sellf.ackArray = []
 		
 	def openListeningSocket(self, IP, port):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
