@@ -16,7 +16,6 @@ def main():
     setup(prm, setup_file)
     print "Setup success"
 
-    
     while True:
         pass
     #prm.checkIncomingChannels
@@ -30,33 +29,45 @@ def main():
 
 def commThread(prm):
     # make sure all incoming channels are initialized first
-    while len(prm.incoming_channels) < prm.num_nodes:
-        for con in prm.incoming_channels:  
+    while len(prm.incoming_channels) < prm.num_nodes - 1 or prm.cli[0] == None:
+        for con in prm.incoming_channels_unordered:  
             try:
                 data = con.recv(1024)
                 if data == "confirmInit":
                     prm.cli[0] = con
                     for dest_id, sock in prm.outgoing_channels.iteritems():
-                        sock.send("confirmInit!")
+                        sock.send("sendID from {0}".format(prm.id))
+
+                # add to ordered incoming channels 
+                elif data.split()[0] == "sendID" :
+                    src = int(data.split()[2])
+                    prm.incoming_channels[src] = con
 
             except socket.error, e:
                 continue
 
+    
     # separate cli from prm connections
     prm.cli[1] = prm.outgoing_channels[prm.id]
     prm.outgoing_channels.pop(prm.id, None)
-    prm.incoming_channels.remove(prm.cli[0])
+    prm.incoming_channels.pop(prm.cli[0], None)
 
+    # print len(prm.incoming_channels)
+    # print prm.incoming_channels
+    # print len(prm.incoming_channels_unordered)
+    # print prm.incoming_channels_unordered
     #start listening
     while True:
 
 
         #listen to prms
-        for con in prm.incoming_channels:  
+        for node_num, con in prm.incoming_channels.iteritems():  
             try:
+               
                 data = con.recv(1024)
-                if data != "confirmInit!":
-                    print data  
+
+                if data == "replicate":
+                    print "received replicate from PRM {0}".format(node_num)
 
                 
 
@@ -69,7 +80,7 @@ def commThread(prm):
             print "receive {0} from cli".format(data)
             if data == "replicate!":
                     for dest_id, sock in prm.outgoing_channels.iteritems():
-                        sock.send("replicate received from a prm")
+                        sock.send("replicate")
 
         except socket.error, e:
             pass
@@ -162,7 +173,8 @@ class Prm(object):
     def __init__(self, prm_id):
         self.id = prm_id
         self.addr_book = []
-        self.incoming_channels = []
+        self.incoming_channels_unordered = []
+        self.incoming_channels = {}
         self.outgoing_channels = {}
         self.cli = [None]*2 # format: [incoming, outgoing]
         self.listeningSocket = None
@@ -197,11 +209,11 @@ class Prm(object):
                     continue
 
     def openIncomingChannels(self):
-        while len(self.incoming_channels) != self.num_nodes:
+        while len(self.incoming_channels_unordered) != self.num_nodes:
             try:
                 con, addr = self.listeningSocket.accept()
                 con.setblocking(0)
-                self.incoming_channels.append(con)
+                self.incoming_channels_unordered.append(con)
             except socket.error:
                 continue            
     #               PREPARE = 0
