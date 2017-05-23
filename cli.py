@@ -8,7 +8,6 @@ import sys
 
 cli = None
 
-
 def main():
 	global cli
 	if(len(sys.argv) != 3):
@@ -28,18 +27,64 @@ def main():
 
 	print "I am cli {0}".format(cli_id)
 	while True:
-		command = raw_input()
-		if command == "replicate":
-			cli.outgoingSocket.send("replicate!")
+		
 
-		elif command == "map":
+		# if prmReplicating:
+		# 	print("PRM in the middle of replicating")
+		# 	# while prmReplicating:
+
+
+		command = raw_input()
+		# make sure command not empty
+		while not command:
+			command = raw_input()
+
+		if command.split()[0] == "map":
+			try:
+				validFile(command.split()[1])
+			except:
+				print "USAGE: map [filename]. File must exist in folder"
+				continue
 			print "map"
 
-		elif command == "stop":
-			print "stop"
+		elif command.split()[0] == "reduce":
+			try:
+				validFile(command.split()[1])
+				validFile(command.split()[2])
+			except:
+				print "USAGE: reduce [filename1] [filename2]. Files must exist in folder"
+				continue
+			print "reduce"
 
-		elif command == "resume":
-			print "resume"	
+		elif command.split()[0] == "replicate":
+			try:
+				validFile(command.split()[1])
+			except:
+				print "USAGE: replicate [filename]. File must exist in folder"
+				continue
+			cli.outgoingSocket.send("replicate!")
+			cli.prmReplicating = True
+
+		elif command.split()[0] == "stop":
+			cli.outgoingSocket.send("stop")
+
+		elif command.split()[0] == "resume":
+			cli.outgoingSocket.send("resume")	
+
+		else:
+			print ""
+			print "Valid cli commands:"
+			print "--------------------------------"
+			print "map [filename]"
+			print "reduce [filename1] [filename2]"
+			print "replicate [filename]"
+			print "stop"
+			print "resume"
+			print "print"
+			print "total [pos1] [pos2]"
+			print "merge [pos1] [pos2]"
+			print "--------------------------------"
+			print ""
 
 def commThread():
 
@@ -49,6 +94,10 @@ def commThread():
 			print data
 		except socket.error, e:
 			continue
+
+def validFile(filename):
+	file = open(filename, "r")
+	file.close()
 
 def setup(cli, setup_file):
 	#Read setup file. ex - setup.txt     
@@ -93,6 +142,8 @@ class Cli(object):
 		self.outgoingSocket = None
 		self.incomingStream = None
 		self.listeningSocket = None
+
+		self.prmReplicating = False
 
 	def openListeningSocket(self, IP, port):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
