@@ -163,11 +163,13 @@ def commThread(prm):
 			#node_id is the source_id of the message
 			try:
 				data = con.recv(1024)
-				print data  
-				for msg in Message.split(data):
-					msg = Message.reconstructFromString(msg.strip())
-					if msg.type == Message.PREPARE:
-						print msg
+				
+				if prm.listening:
+					print data  
+					for msg in Message.split(data):
+						msg = Message.reconstructFromString(msg.strip())
+						if msg.type == Message.PREPARE:
+							print msg
 			except socket.error, e:
 				continue
 			incomingChannelIndex += 1
@@ -175,10 +177,20 @@ def commThread(prm):
 		  # listen to cli
 		try:
 			data = prm.cli[0].recv(1024)
-			print "receive {0} from cli".format(data)
-			if data == "replicate!":
-					for dest_id, sock in prm.outgoing_channels.iteritems():
-						sock.send("replicate")
+
+			if prm.listening:
+				print "receive {0} from cli".format(data)
+				if data == "replicate!":
+						for dest_id, sock in prm.outgoing_channels.iteritems():
+							sock.send("replicate")
+				elif data == "stop":
+					print "Stopping PRM"
+					prm.listening = False
+
+			elif data == "resume":
+				print "Resuming PRM"
+				prm.listening = True
+
 		except socket.error, e:
 			pass
 
@@ -296,6 +308,7 @@ class Prm(object):
 		self.outgoing_channels = {}
 		self.cli = [None]*2 #format: [incoming,outgoing]
 		self.listeningSocket = None
+		self.listening = False
 		self.done_processes = set()
 
 		self.proposedFile = None
@@ -323,6 +336,7 @@ class Prm(object):
 		self.listeningSocket.bind( (IP, port) )
 		self.listeningSocket.setblocking(0) 
 		self.listeningSocket.listen(1)
+		self.listening = True
 
 	def addOutgoingChannel(self, dest_id):
 		self.outgoing_channels[dest_id] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -346,8 +360,10 @@ class Prm(object):
 			except socket.error:
 				continue           
 
-
-
+	def stop():
+		self.listening = False
+	def resume():
+		self.listening = True
 
 	def execute(self, command):
 		self.checkIncomingMsgs()
