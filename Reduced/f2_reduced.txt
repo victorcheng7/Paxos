@@ -1,0 +1,6 @@
+ball 3
+state 2
+bull 45
+car 3
+stately 3
+cat 2

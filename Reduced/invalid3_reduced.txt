@@ -1,0 +1,5 @@
+dang 3
+dam 3
+trinket 34
+size 0
+cactus 3
