@@ -175,22 +175,32 @@ def commThread(prm):
 						msg = Message.reconstructFromString(msg.strip())
 
 						if msg.msgType == Message.PREPARE:
+							print ("Received Prepare Message from ", msg.source_id, msg.ballot, msg.index, msg.originalPRM, msg.msgType)
+							'''
 							if msg.index < prm.index: #update source_id with missing log entries
-								#TODO update Moduralize? send("update", log entries and corresponding index) to msg.source_id
-   							if msg.ballot > prm.ballot:
+								TODO update Moduralize? send("update", log entries and corresponding index) to msg.source_id
+   							'''
+   							msgBallotTuple = msg.ballot.split(",") # ex "1,0"
+   							prmBallotTuple = prm.ballot.split(",") # ex. "1,0"
+   							if ((msgBallotTuple[0] > prmBallotTuple[0]) or ((msgBallotTuple[0] == prmBallotTuple[0]) and (msgBallotTuple[1] > prmBallotTuple))):
+					        	'''
 						        if index of proposal > prm.index: #ask for update from source_id, cause you have missing log entries
 									#TODO send("update", log entries and corresponding index) to msg.source_id
 						        if index of proposal < prm.index: 
-						            #update the source_id all the entries in the log before the proposal
+					            	#update the source_id all the entries in the log before the proposal
+				            	'''
 						        prm.ballot = msg.ballot
-					        #TODO send Ack(prm.id, prm.ballot, acceptTuple, acceptVal, index, msg.originalPRM ACK) to original preparer
-							print ("Received Prepare Message from ", msg.source_id, msg.ballot, msg.index, msg.originalPRM, msg.msgType)
+								ackMsg = Message(prm.id, prm.ballot, prm.acceptTuple, prm.acceptVal, prm.index, msg.originalPRM, None, Message.PREPARE)
+								prm.outgoing_channels[msg.source_id].send(str(ackMsg)) #send prepare message to original proposer
+						        print ("Sent Ack message to node ", dest_id) 
 						if msg.msgType == Message.ACK:
 							print "inside of Message.ACK receive"
+							print ("Received ACK Message from ", msg.source_id, msg.ballot, prm.acceptTuple, prm.acceptVal, msg.index, msg.originalPRM, msg.log, msg.msgType)
 						if msg.msgType == Message.ACCEPT:
 							print "inside of Message.ACCEPT receive"
 						if msg.msgType == Message.DECIDE:
 							print "inside of Message.DECIDE receive"
+							#send message back to CLI that the value has been decided.. if msg is decide
 						if msg.msgType == Message.UPDATE:
 							print "inside of Message.UPDATE receive"
 
@@ -205,6 +215,7 @@ def commThread(prm):
 			if prm.listening:
 				print "received {0} from cli".format(data)
 				if splitData[0] == "replicate": #ex. replicate words.txt
+					time.sleep(3)
 					prm.proposedFile = splitData[1]
 					prm.incrementBallot()
 					for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
@@ -347,7 +358,7 @@ class Prm(object):
 		self.num_nodes = 0
 		self.numAccepts = 1
 		self.ballot = "0," + str(site_id) 
-		self.acceptTuple = "0,0"
+		self.acceptTuple =  None #"0,0"
 		self.acceptVal = None
 		self.index = 0
 		self.ackArray = []
@@ -367,7 +378,6 @@ class Prm(object):
 		self.listening = False
 	def resume():
 		self.listening = True
-
 
 
 
