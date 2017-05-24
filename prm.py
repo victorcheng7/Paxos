@@ -11,11 +11,9 @@ To help debug, print out every receive and send message and who you're sending t
 States I need to add to PRM - stop/resume, send update messages to all outgoing
 
 TODO
-make a modular function that loops through and sends all the relevant log entries one by one
-make a modular function that does a timeout and checks to see if you have majority
-1) accept 2) acknowledge
-Problem - How do I detect majority accept/ack or Not? 
-(Wait 400ms to make sure it didn't actually get majority accept or ack messages, time.sleep random # before reprposing)
+make a modular function sendUpdatedLogEntries()-- loops through and sends all the relevant log entries one by one
+make a modular function checkMajorityAccept()-- timeout and checks to see if !majority accepts, repropose with time.sleep(random)
+make a modular function checkMajorityAcks() -- timeout and checks to see if !majority acks, reproposes with time.sleep(random)
 *******************
  if replicate:
     prm.proposedFile = the second part of the replicate message that was validated by CLI
@@ -104,9 +102,10 @@ if DECIDE:
 if UPDATE:
 	if msg.index < prm.index:
 		#update msg.source_id
-		counter = prm.index-msg.index
-		while counter != prm.index + 1
-			send(prm.id, counter, prm.log[counter], "UPDATE") to msg.source_id #send a bunch of corresponding log entries
+		counter = msg.index
+		while counter != prm.index + 1: #send all missing log entries one by one
+			send(prm.id, counter, prm.log[counter], "UPDATE") to msg.source_id 
+			counter += 1
 	elif (msg.index > prm.index) and (msg.log != None):
 		#please update me
 		prm.log[msg.index] = msg.log 			
@@ -123,14 +122,6 @@ def main():
 
 	while True:
 		pass
-	#site.checkIncomingChannels
-
-	# Do all the paxos protocol related stuff
-
-	#commThread(site)
-
-	#assume that all connections are there prm and cli connections
-
 
 def commThread(prm):
 	while (len(prm.incoming_channels) < (prm.num_nodes-1)) or prm.cli[0] == None:
@@ -158,7 +149,6 @@ def commThread(prm):
 
 # MAKE SURE CORRESPOND TO THIS FORMAT 	def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, type):
 	while True:
-		incomingChannelIndex = 0
 		for node_id, con in prm.incoming_channels.iteritems():  
 			#node_id is the source_id of the message
 			try:
@@ -170,15 +160,14 @@ def commThread(prm):
 						print msg
 			except socket.error, e:
 				continue
-			incomingChannelIndex += 1
 
 		  # listen to cli
 		try:
 			data = prm.cli[0].recv(1024)
 			print "receive {0} from cli".format(data)
 			if data == "replicate!":
-					for dest_id, sock in prm.outgoing_channels.iteritems():
-						sock.send("replicate")
+				for dest_id, sock in prm.outgoing_channels.iteritems():
+					sock.send("replicate")
 		except socket.error, e:
 			pass
 
@@ -211,7 +200,6 @@ def setup(prm, setup_file):
 	cThread = threading.Thread(target = commThread, args=(prm,))
 	cThread.daemon = True
 	cThread.start()
-
 
 	prm.openIncomingChannels()
 
@@ -307,6 +295,13 @@ class Prm(object):
 		self.index = 0
 		self.ackArray = []
 		self.log = []
+
+		make a modular function sendUpdatedLogEntries()-- loops through and sends all the relevant log entries one by one
+make a modular function checkMajorityAccept()-- timeout and checks to see if !majority accepts, repropose with time.sleep(random)
+make a modular function checkMajorityAcks() -- timeout and checks to see if !majority acks, reproposes with time.sleep(random)
+
+	def sendUpdatedLogEntries(self, msg):
+
 	def newRoundCleanUp(self):
 		self.proposedFile = None
 		self.numAccepts = 1
