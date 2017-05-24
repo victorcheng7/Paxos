@@ -1,0 +1,5 @@
+cat 2
+dog 5
+animal 10
+cat 4
+the 3
