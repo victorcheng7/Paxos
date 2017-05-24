@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+from termios import tcflush, TCIFLUSH
 import socket
 import time
 import threading
@@ -7,7 +7,6 @@ import sys
 
 
 cli = None
-
 
 def main():
 	global cli
@@ -28,27 +27,94 @@ def main():
 
 	print "I am cli {0}".format(cli_id)
 	while True:
-		command = raw_input()
-		if command == "replicate":
-			cli.outgoingSocket.send("replicate!")
+		
 
-		elif command == "map":
+		if cli.prmReplicating:
+			sys.stdout.write("PRM in the middle of replicating")
+			while cli.prmReplicating:
+				sys.stdout.flush()
+				time.sleep(1)
+				sys.stdout.write(".")
+			tcflush(sys.stdin, TCIFLUSH)
+			
+		command = None
+		# make sure command not empty
+		while not command:
+			command = raw_input()
+
+		if command.split()[0] == "map":
+			try:
+				validFile(command.split()[1])
+			except:
+				print "USAGE: map [filename]. File must exist in folder"
+				continue
 			print "map"
 
-		elif command == "stop":
-			print "stop"
+		elif command.split()[0] == "reduce":
+			try:
+				validFile(command.split()[1])
+				validFile(command.split()[2])
+			except:
+				print "USAGE: reduce [filename1] [filename2]. Files must exist in folder"
+				continue
+			print "reduce"
 
-		elif command == "resume":
-			print "resume"	
+		elif command.split()[0] == "replicate":
+			try:
+				validFile(command.split()[1])
+			except:
+				print "USAGE: replicate [filename]. File must exist in folder"
+				continue
+			cli.outgoingSocket.send("replicate!")
+			cli.prmReplicating = True
+
+		elif command.split()[0] == "stop":
+			cli.outgoingSocket.send("stop")
+
+		elif command.split()[0] == "resume":
+			cli.outgoingSocket.send("resume")	
+
+		else:
+			print ""
+			print "Valid cli commands:"
+			print "--------------------------------"
+			print "map [filename]"
+			print "reduce [filename1] [filename2]"
+			print "replicate [filename]"
+			print "stop"
+			print "resume"
+			print "print"
+			print "total [pos1] [pos2]"
+			print "merge [pos1] [pos2]"
+			print "--------------------------------"
+			print ""
 
 def commThread():
 
 	while True:
 		try:
 			data = cli.incomingStream.recv(1024)
-			print data
+			#print data
+			if data == "stopped":
+				cli.prmReplicating = False
+				time.sleep(1.5)
+				print "\nError: Prm is stopped."
+
+
+			if data == "finishedSetup":
+				print "setup finished"
+
+			if data == "finishReplicating":
+				cli.prmReplicating = False
+				time.sleep(1.5)
+				print "done"
+
 		except socket.error, e:
 			continue
+
+def validFile(filename):
+	file = open(filename, "r")
+	file.close()
 
 def setup(cli, setup_file):
 	#Read setup file. ex - setup.txt     
@@ -93,6 +159,8 @@ class Cli(object):
 		self.outgoingSocket = None
 		self.incomingStream = None
 		self.listeningSocket = None
+
+		self.prmReplicating = False
 
 	def openListeningSocket(self, IP, port):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
