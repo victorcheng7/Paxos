@@ -183,16 +183,17 @@ def commThread(prm):
    							msgBallotTuple = msg.ballot.split(",") # ex "1,0"
    							prmBallotTuple = prm.ballot.split(",") # ex. "1,0"
    							if ((msgBallotTuple[0] > prmBallotTuple[0]) or ((msgBallotTuple[0] == prmBallotTuple[0]) and (msgBallotTuple[1] > prmBallotTuple))):
-					        	'''
-						        if index of proposal > prm.index: #ask for update from source_id, cause you have missing log entries
-									#TODO send("update", log entries and corresponding index) to msg.source_id
-						        if index of proposal < prm.index: 
-					            	#update the source_id all the entries in the log before the proposal
-				            	'''
-						        prm.ballot = msg.ballot
+							    	'''
+								        if index of proposal > prm.index: #ask for update from source_id, cause you have missing log entries
+											#TODO send("update", log entries and corresponding index) to msg.source_id
+								        if index of proposal < prm.index: 
+							            	#update the source_id all the entries in the log before the proposal
+					           		'''
+						   		prm.ballot = msg.ballot
 								ackMsg = Message(prm.id, prm.ballot, prm.acceptTuple, prm.acceptVal, prm.index, msg.originalPRM, None, Message.PREPARE)
 								prm.outgoing_channels[msg.source_id].send(str(ackMsg)) #send prepare message to original proposer
-						        print ("Sent Ack message to node ", dest_id) 
+						    	print ("Sent Ack message to node ", dest_id) 
+
 						if msg.msgType == Message.ACK:
 							print "inside of Message.ACK receive"
 							print ("Received ACK Message from ", msg.source_id, msg.ballot, prm.acceptTuple, prm.acceptVal, msg.index, msg.originalPRM, msg.log, msg.msgType)
