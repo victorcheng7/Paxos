@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+from termios import tcflush, TCIFLUSH
 import socket
 import time
 import threading
@@ -29,12 +29,15 @@ def main():
 	while True:
 		
 
-		# if prmReplicating:
-		# 	print("PRM in the middle of replicating")
-		# 	# while prmReplicating:
-
-
-		command = raw_input()
+		if cli.prmReplicating:
+			sys.stdout.write("PRM in the middle of replicating")
+			while cli.prmReplicating:
+				sys.stdout.flush()
+				time.sleep(1)
+				sys.stdout.write(".")
+			tcflush(sys.stdin, TCIFLUSH)
+			
+		command = None
 		# make sure command not empty
 		while not command:
 			command = raw_input()
@@ -91,7 +94,21 @@ def commThread():
 	while True:
 		try:
 			data = cli.incomingStream.recv(1024)
-			print data
+			#print data
+			if data == "stopped":
+				cli.prmReplicating = False
+				time.sleep(1.5)
+				print "\nError: Prm is stopped."
+
+
+			if data == "finishedSetup":
+				print "setup finished"
+
+			if data == "finishReplicating":
+				cli.prmReplicating = False
+				time.sleep(1.5)
+				print "done"
+
 		except socket.error, e:
 			continue
 

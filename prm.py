@@ -154,7 +154,7 @@ def commThread(prm):
 	prm.cli[1] = prm.outgoing_channels[prm.id]
 	prm.outgoing_channels.pop(prm.id, None)
 	prm.incoming_channels.pop(prm.cli[0], None)
-
+	prm.cli[1].send("finishedSetup")
 
 # MAKE SURE CORRESPOND TO THIS FORMAT 	def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, type):
 	while True:
@@ -183,6 +183,8 @@ def commThread(prm):
 				if data == "replicate!":
 						for dest_id, sock in prm.outgoing_channels.iteritems():
 							sock.send("replicate")
+						time.sleep(4)
+						prm.cli[1].send("finishReplicating")
 				elif data == "stop":
 					print "Stopping PRM"
 					prm.listening = False
@@ -190,6 +192,9 @@ def commThread(prm):
 			elif data == "resume":
 				print "Resuming PRM"
 				prm.listening = True
+
+			else:
+				prm.cli[1].send("stopped")
 
 		except socket.error, e:
 			pass
@@ -226,9 +231,7 @@ def setup(prm, setup_file):
 
 
 	prm.openIncomingChannels()
-
-
-	# separate cli
+	print "setup finished"
 
 class Ballot(object):
 	def __init__(self, ballot1, ballot2):
