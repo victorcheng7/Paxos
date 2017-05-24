@@ -14,7 +14,6 @@ States I need to add to PRM - stop/resume, send update messages to all outgoing
     prm.proposedFile = the second part of the replicate message that was validated by CLI
     prm.ballot[0] += 1 #change ballot number
     send all prms Message(prm.ballot, prm.id, index, "PREPARE")
-    TODO ORIGINAL PRM SHOULD BE LISTENING TO MAJORITY OF ACKNOWLEDGEMENTS, IF NOT REPROPOSE
 idea 1- 
 if stop: 
     tear down all incoming channels, so you can only listen to cmds from CLI
@@ -35,17 +34,6 @@ if total, print, merge EASY:
     add up total words inside each files 
 
 
-
-if Prepare: 
-	if msg.index < prm.index: 
-		send("update", log entries and corresponding index) to msg.source_id
-    if msg.ballot > prm.ballot:
-        if index of proposal > prm.index:
-            ask that source_id for your missing entries in log
-        if index of proposal < prm.index: 
-            update the source_id all the entries in the log before the proposal
-        prm.ballot = msg.ballot
-        send Ack(prm.id, prm.ballot, acceptTuple, acceptVal, index, msg.originalPRM ACK) to original preparer
 if Ack: 
     Keep track array of array of ACK messages objects
     prm.ackArray.append(msg)
@@ -145,7 +133,9 @@ def commThread(prm):
 # msg format - def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, type):
 	while True:
 		'''
-		TODO when should you ask for update? and when should you send an update automatically? Look at every mendMessage, sendPrepare, etc.
+		Questions when should you ask for update? and when should you send an update automatically? Look at every mendMessage, sendPrepare, etc.
+		when should you send each message? prepare only after replicating. when would you receive a message? only receive prepare if a node wants
+		to propose a value
 		TODO code checkMajorityAcks and checkMajorityAccepts
 		PRM 
 			self.proposedFile = None
@@ -158,11 +148,6 @@ def commThread(prm):
 			self.ackArray = []
 			self.log = []
 		
-		def sendPrepare(self, dest_id):
-			print("Send Prepare message to ", dest_id)
-			self.ballot[0] += 1
-			msg = Message(self.id, self.ballot, None, None, self.index, self.id, None, Message.PREPARE)
-			self.outgoing_channels[dest_id].send(str(msg))
 		def sendAck(self, dest_id):
 			#TODO when constructing message object, originalPRM should be msg.originalPRM 
 		def sendAccept(self, dest_id):
@@ -181,14 +166,24 @@ def commThread(prm):
 		Message(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, type):
 
 		'''
-		for msg_source_id, con in prm.incoming_channels.iteritems():  
+		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
 				data = con.recv(1024)
 				if prm.listening:
 					#incoming messages from other PRMS
 					for msg in Message.split(data):
 						msg = Message.reconstructFromString(msg.strip())
+
 						if msg.msgType == Message.PREPARE:
+							if msg.index < prm.index: #update source_id with missing log entries
+								#TODO update Moduralize? send("update", log entries and corresponding index) to msg.source_id
+   							if msg.ballot > prm.ballot:
+						        if index of proposal > prm.index: #ask for update from source_id, cause you have missing log entries
+									#TODO send("update", log entries and corresponding index) to msg.source_id
+						        if index of proposal < prm.index: 
+						            #update the source_id all the entries in the log before the proposal
+						        prm.ballot = msg.ballot
+					        #TODO send Ack(prm.id, prm.ballot, acceptTuple, acceptVal, index, msg.originalPRM ACK) to original preparer
 							print ("Received Prepare Message from ", msg.source_id, msg.ballot, msg.index, msg.originalPRM, msg.msgType)
 						if msg.msgType == Message.ACK:
 							print "inside of Message.ACK receive"
@@ -196,6 +191,9 @@ def commThread(prm):
 							print "inside of Message.ACCEPT receive"
 						if msg.msgType == Message.DECIDE:
 							print "inside of Message.DECIDE receive"
+						if msg.msgType == Message.UPDATE:
+							print "inside of Message.UPDATE receive"
+
 			except socket.error, e:
 				continue
 
