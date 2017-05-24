@@ -62,11 +62,11 @@ def main():
 		elif command.split()[0] == "replicate":
 			try:
 				validFile(command.split()[1])
+				cli.outgoingSocket.send("replicate " + command.split()[1]) 
+				cli.prmReplicating = True
 			except:
 				print "USAGE: replicate [filename]. File must exist in folder"
 				continue
-			cli.outgoingSocket.send("replicate!")
-			cli.prmReplicating = True
 
 		elif command.split()[0] == "stop":
 			cli.outgoingSocket.send("stop")
@@ -114,6 +114,7 @@ def commThread():
 
 def validFile(filename):
 	file = open(filename, "r")
+	#TODO check to see if file is reduced file
 	file.close()
 
 def setup(cli, setup_file):
