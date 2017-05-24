@@ -10,11 +10,6 @@ import copy
 To help debug, print out every receive and send message and who you're sending to
 States I need to add to PRM - stop/resume, send update messages to all outgoing
 
-TODO
-make a modular function sendUpdatedLogEntries()-- loops through and sends all the relevant log entries one by one
-make a modular function checkMajorityAccept()-- timeout and checks to see if !majority accepts, repropose with time.sleep(random)
-make a modular function checkMajorityAcks() -- timeout and checks to see if !majority acks, reproposes with time.sleep(random)
-*******************
  if replicate:
     prm.proposedFile = the second part of the replicate message that was validated by CLI
     prm.ballot[0] += 1 #change ballot number
@@ -147,12 +142,13 @@ def commThread(prm):
 	prm.incoming_channels.pop(prm.cli[0], None)
 	prm.cli[1].send("finishedSetup")
 
-# MAKE SURE CORRESPOND TO THIS FORMAT 	def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, type):
+# msg format - def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, type):
 	while True:
 		for msg_source_id, con in prm.incoming_channels.iteritems():  
 			try:
 				data = con.recv(1024)
 				if prm.listening:
+					#TODO incoming messages from other PRMS
 					print "Received: ", data  
 					for msg in Message.split(data):
 						msg = Message.reconstructFromString(msg.strip())
@@ -167,10 +163,10 @@ def commThread(prm):
 			if prm.listening:
 				print "receive {0} from cli".format(data)
 				if data == "replicate!":
-						for dest_id, sock in prm.outgoing_channels.iteritems():
-							sock.send("replicate")
-						time.sleep(4)
-						prm.cli[1].send("finishReplicating")
+					for dest_id, sock in prm.outgoing_channels.iteritems():
+						sock.send("replicate")
+					time.sleep(4)
+					prm.cli[1].send("finishReplicating")
 				elif data == "stop":
 					print "Stopping PRM"
 					prm.listening = False
@@ -178,6 +174,9 @@ def commThread(prm):
 			elif data == "resume":
 				print "Resuming PRM"
 				prm.listening = True
+				#for dest_id, sock in prm.outgoing_channels.iteritems():
+					#sendUpdate(everything in message)
+				#send a message to all PRMs asking for updates
 
 			else:
 				prm.cli[1].send("stopped")
@@ -308,12 +307,6 @@ class Prm(object):
 		self.ackArray = []
 		self.log = []
 
-		make a modular function sendUpdatedLogEntries()-- loops through and sends all the relevant log entries one by one
-make a modular function checkMajorityAccept()-- timeout and checks to see if !majority accepts, repropose with time.sleep(random)
-make a modular function checkMajorityAcks() -- timeout and checks to see if !majority acks, reproposes with time.sleep(random)
-
-	def sendUpdatedLogEntries(self, msg):
-
 	def newRoundCleanUp(self):
 		self.proposedFile = None
 		self.numAccepts = 1
@@ -323,7 +316,74 @@ make a modular function checkMajorityAcks() -- timeout and checks to see if !maj
 		self.acceptTuple = [None, None]
 		self.acceptVal = None
 		sellf.ackArray = []
+
+	def stop():
+		self.listening = False
+	def resume():
+		self.listening = True
+
+
+
+
+	'''
+	TODO when should you ask for update? and when should you send an update automatically? Look at every mendMessage, sendPrepare, etc.
+	checkMajorityAcks and checkMajorityAccepts
+
+	Message(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, type):
+	PRM 
+		self.proposedFile = None
+		self.num_nodes = 0
+		self.numAccepts = 1
+		self.ballotTuple = [0, site_id]
+		self.acceptTuple = [None, None]
+		self.acceptVal = None
+		self.index = 0
+		self.ackArray = []
+		self.log = []
+	'''
+	def sendPrepare(self, dest_id):
+		print("Send Prepare message to ", dest_id)
+		self.ballotTuple[0] += 1
+		msg = Message(self.id, self.ballot, None, None, len(self.log), Message.PREPARE)
+		self.outgoing_channels[dest_id].send(str(msg))
 		
+	def sendAck(self, dest_id):
+		print("Send Ack message to ", dest_id)
+
+		msg = Message(self.id, snap_id, None, Message.MARKER_TYPE)
+		for dest_id, sock in self.outgoing_channels.iteritems():
+			sock.send(str(msg))
+	def sendAccept(self, dest_id):
+		print("Send Accept message to ", dest_id)
+		msg = Message(self.id, None, done_process_id, Message.DONE_TYPE)
+		for dest_id, sock in self.outgoing_channels.iteritems():
+			sock.send(str(msg))
+
+	def sendDecide(self, dest_id):
+		print("Send Decide message to ", dest_id)
+		msg = Message(self.id, None, done_process_id, Message.DONE_TYPE)
+		for dest_id, sock in self.outgoing_channels.iteritems():
+			sock.send(str(msg))
+	def sendUpdate(self, dest_id):
+		print("Send Update message to ", dest_id)
+		msg = Message(self.id, None, done_process_id, Message.DONE_TYPE)
+		for dest_id, sock in self.outgoing_channels.iteritems():
+			sock.send(str(msg))
+
+	def checkMajorityAcks(self, msg):
+		time.sleep(.4)
+		#TODO checks to see if !majority accepts, repropose with time.sleep(random)
+
+	def checkMajorityAccepts(self, msg):
+		time.sleep(.4)
+		#TODO checks to see if !majority acks, reproposes with time.sleep(random)
+
+		
+
+
+
+
+
 	def openListeningSocket(self, IP, port):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.listeningSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -354,11 +414,7 @@ make a modular function checkMajorityAcks() -- timeout and checks to see if !maj
 			except socket.error:
 				continue           
 
-	def stop():
-		self.listening = False
-	def resume():
-		self.listening = True
-
+'''
 	def execute(self, command):
 		self.checkIncomingMsgs()
 		keyWords = command.split()
@@ -375,57 +431,6 @@ make a modular function checkMajorityAcks() -- timeout and checks to see if !maj
 			print "CANNOT RECOGNIZE THE COMMAND: " + command
 			exit(1)
 		self.checkIncomingMsgs()
-
-
-	def sendProposal(self, dest_id, site_id):
-			#def __init__(self, source_id, ballotTuple, acceptTuple, acceptVal, index, type):
-		self.ballot[0] += 1
-		msg = Message(self.id, self.ballot, None, None, len(self.log), Message.PREPARE)
-		self.outgoing_channels[dest_id].send(str(msg))
-		'''
-			def __init__(self, source_id, ballot_num, accept_num, accept_val, index, type):
-			self.num_nodes = 0
-				self.numAccepts = 0
-				self.numAcks = 0
-				self.ballotTuple = (0, 0)
-				self.acceptTuple = (0, 0)
-				self.acceptVal = 0
-				self.logs = []
-
-			PREPARE = 0
-			ACK = 1
-			ACCEPT = 2
-			DECIDE = 3
-			def __init__(self, source_id, ballot_num, accept_num, accept_val, index, type):
-				self.source_id = source_id
-				self.ballot_num = ballot_num
-				self.accept_num = accept_num
-				self.accept_val = accept_val
-				self.index = index
-				self.type = type
-						if msg.type === Message.PREPARE:
-		'''
-
-	def sendMarkers(self, snap_id):
-		msg = Message(self.id, snap_id, None, Message.MARKER_TYPE)
-		for dest_id, sock in self.outgoing_channels.iteritems():
-			sock.send(str(msg))
-
-	def sendDone(self, done_process_id):
-		#Piggy Back amount with done_process_id
-		msg = Message(self.id, None, done_process_id, Message.DONE_TYPE)
-		for dest_id, sock in self.outgoing_channels.iteritems():
-			sock.send(str(msg))
-
-	def startSnapshot(self):
-		self.snap_count += 1
-		counter = 0
-		snap_id = str(self.id) + "." + str(self.snap_count)
-		site_state = self.balance #Take Local State Snapshot
-		incoming_channels_states = copy.deepcopy(self.SnapIDTableLastEntryTemplate)
-		self.snapID_table[snap_id] = [counter, site_state, incoming_channels_states]
-		self.sendMarkers(snap_id)
-
 
 	def checkIncomingMsgs(self):
 		BUF_SIZE = 1024
@@ -468,5 +473,7 @@ make a modular function checkMajorityAcks() -- timeout and checks to see if !maj
 						exit(1)
 			except socket.error, e:
 				continue
+
+'''
 
 main()
