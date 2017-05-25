@@ -2,6 +2,12 @@
 
 To run:
 
+#shortcut get started
+run ./test.sh to auto-start 3 CLIs and 3 PRMs
+wait for "setup finished" and run "replicate Reduced/[reduced_file]" in any CLI terminal to start Paxos 
+
+
+manual execution
 1) Create setup file in this format:
 
 [numNodes]
@@ -15,8 +21,8 @@ example :
 
 2) open [numNodes] CLIs and PRMs in separate terminal windows using:
 
-	python prm.py [nodeNum] [setup_file]
-	python cli.py [nodeNum] [setup_file]
+	python prm.py [nodeID] [setup_file]
+	python cli.py [nodeID] [setup_file]
 
 
 3) wait for all windows to display "setup finished"
