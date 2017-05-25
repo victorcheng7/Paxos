@@ -34,31 +34,6 @@ if total, print, merge EASY:
     add up total words inside each files 
 
 
-if Ack: 
-    Keep track array of array of ACK messages objects
-    prm.ackArray.append(msg)
-    if len(prm.ackarray) + 1 > upper(0.5*prm.num_nodes):
-        tempAcceptTuple = [None, None] #message with the highest acceptTuple
-        tempAcceptVal = None #acceptVal with the highest acceptTuple
-        isValue = false
-        for msgs messages prm.ackArray: 
-            check if there are any messages that contains acceptVal 
-            if there are:
-                isValue = true
-                #max of acceptTuple for ACK messages array, 
-                tempAcceptTuple = msg with highest acceptTuple.acceptTuple 
-                tempAcceptVal = msg with highest acceptTuple.acceptVal    
-
-        if counter == 0:
-            prm.acceptTuple = prm.ballot
-            prm.acceptVal = prm.proposedFile
-        else: 
-            prm.acceptTuple = tempAcceptTuple
-            prm.acceptVal = tempAcceptVal
-        for all outgoing channels:
-            send(prm.id, prm.ballot, prm.acceptTuple, prm.acceptVal, prm.index, originalPRM, "ACCEPT")
-            TODO ORIGINAL PRM SHOULD BE LISTENING FOR ACCEPTS FROM MAJORITY IF NOT REPROPOSE
-
 if ACCEPT: 
     if msg.index > prm.index: 
        	send(prm.id, None, None, None, None, None, None, "UPDATE") #Ask for entire log
@@ -74,6 +49,8 @@ if ACCEPT:
             for all outgoing channels: 
                 send(prm.id, None, None, prm.proposedFile, prm.index, msg.originalPRM, None, "DECIDE")
             send("finished with replicate and your file successfully added to log") to CLI
+    if it's the first time receiving accept for a given ballot number, send to all other num_nodes
+    otherwise don't send anything
     
 if DECIDE: 
 	if msg.index > prm.index:
@@ -136,20 +113,7 @@ def commThread(prm):
 		Questions when should you ask for update? and when should you send an update automatically? Look at every mendMessage, sendPrepare, etc.
 		when should you send each message? prepare only after replicating. when would you receive a message? only receive prepare if a node wants
 		to propose a value
-		TODO code checkMajorityAcks and checkMajorityAccepts
-		PRM 
-			self.proposedFile = None
-			self.num_nodes = 0
-			self.numAccepts = 1
-			self.ballot = [0, site_id]
-			self.acceptTuple = [None, None]
-			self.acceptVal = None
-			self.index = 0
-			self.ackArray = []
-			self.log = []
 		
-		def sendAck(self, dest_id):
-			#TODO when constructing message object, originalPRM should be msg.originalPRM 
 		def sendAccept(self, dest_id):
 			#TODO when constructing message object, originalPRM should be msg.originalPRM
 		def sendDecide(self, dest_id):
@@ -190,14 +154,24 @@ def commThread(prm):
 							            	#update the source_id all the entries in the log before the proposal
 					           		'''
 						   		prm.ballot = msg.ballot
-								ackMsg = Message(prm.id, prm.ballot, prm.acceptTuple, prm.acceptVal, prm.index, msg.originalPRM, None, Message.PREPARE)
+						   		print "this is originalPRM", msg.originalPRM
+								ackMsg = Message(prm.id, prm.ballot, prm.acceptTuple, msg.acceptVal, prm.index, msg.originalPRM, None, Message.ACK)
 								prm.outgoing_channels[msg.source_id].send(str(ackMsg)) #send prepare message to original proposer
-						    	print ("Sent Ack message to node ", dest_id) 
+						    	print ("Sent Ack message to node ", dest_id)
 
 						if msg.msgType == Message.ACK:
-							print "inside of Message.ACK receive"
 							print ("Received ACK Message from ", msg.source_id, msg.ballot, prm.acceptTuple, prm.acceptVal, msg.index, msg.originalPRM, msg.log, msg.msgType)
+							if not prm.checkingMajorityAcks: 
+								prm.checkingMajorityAcks = True
+								prm.ackarray.append(msg)
+								majorityAckThread = threading.Thread(target=prm.checkMajorityAcks)
+								majorityAckThread.daemon = True
+								majorityAckThread.start()
+							else:
+								prm.ackarray.append(msg)
+
 						if msg.msgType == Message.ACCEPT:
+							#send all outgoing channels same accept message, relay it. if it's the first time receiving it
 							print "inside of Message.ACCEPT receive"
 						if msg.msgType == Message.DECIDE:
 							print "inside of Message.DECIDE receive"
@@ -216,12 +190,12 @@ def commThread(prm):
 			if prm.listening:
 				print "received {0} from cli".format(data)
 				if splitData[0] == "replicate": #ex. replicate words.txt
-					time.sleep(3)
+					time.sleep(1)
 					prm.proposedFile = splitData[1]
 					prm.incrementBallot()
 					for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
 						print ("Sent Prepare message to node ", dest_id)
-						msg = Message(prm.id, prm.ballot, None, None, prm.index, prm.id, None, Message.PREPARE)
+						msg = Message(prm.id, prm.ballot, None, prm.proposedFile, prm.index, prm.id, None, Message.PREPARE)
 						sock.send(str(msg))						
 				elif data == "stop":
 					print "Stopping PRM"
@@ -322,15 +296,15 @@ class Message(object):
 		originalPRM = None
 		log = None
 		if msgType == Message.PREPARE: 
-			originalPRM = int(keyWords[4])
+			acceptVal = keyWords[4]
+			originalPRM = int(keyWords[5])
 		if msgType == Message.ACK:
-			acceptTuple = int(keyWords[4])
-			acceptVal = int(keyWords[5])
+			acceptTuple = keyWords[4]
+			acceptVal = keyWords[5]
 			originalPRM = int(keyWords[6])
 		if msgType == Message.ACCEPT:
-			acceptTuple = int(keyWords[4]) #this is Done Process ID
-			acceptVal = int(keyWords[5])
-			originalPRM = int(keyWords[6])
+			acceptVal = keyWords[4]
+			originalPRM = int(keyWords[5])
 		if msgType == Message.UPDATE:
 			log = str(keyWords[4])
 		return Message(source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, msgType)
@@ -357,23 +331,24 @@ class Prm(object):
 
 		self.proposedFile = None
 		self.num_nodes = 0
-		self.numAccepts = 1
 		self.ballot = "0," + str(site_id) 
-		self.acceptTuple =  None #"0,0"
-		self.acceptVal = None
+		self.acceptTuple =  "0,0" #Default acceptTuple if None
+		self.acceptVal = "-1" #Default acceptVal if None
 		self.index = 0
-		self.ackArray = []
+		self.ackarray = []
+		self.acceptarray = []
+		self.checkingMajorityAcks = False
+		self.checkingMajorityAccepts = False
 		self.log = []
 
 	def newRoundCleanUp(self):
 		self.proposedFile = None
-		self.numAccepts = 1
-		self.numAcks = 1
 		self.ballot = "0," + str(site_id) 
 		#self.ballot = [0, site_id]
 		self.acceptTuple = "0,0"
 		self.acceptVal = None
-		sellf.ackArray = []
+		self.ackarray = []
+		self.acceptarray = []
 
 	def stop():
 		self.listening = False
@@ -381,6 +356,42 @@ class Prm(object):
 		self.listening = True
 
 
+	def checkMajorityAcks(self):
+		print "Checking to see if I have Majority Acks..."
+		time.sleep(0.5) 
+		if (len(self.ackarray) + 1) >= 0.5*(self.num_nodes+1):
+			print "I have majority Acks!"
+			highestAcceptNum = "0,0" #message with the highest acceptTuple
+			highestAcceptVal = "-1" #acceptVal with the highest acceptTuple
+			checkAcceptNum = [0,0]
+
+			for msg in self.ackarray: #set highestAcceptNum = highest AcceptNum out of all the messages
+				tempAcceptNum = msg.acceptTuple.split(",")
+				if ((tempAcceptNum[0] > checkAcceptNum[0]) or ((tempAcceptNum[0] == checkAcceptNum[0]) and (tempAcceptNum[1] > checkAcceptNum))):
+					highestAcceptNum = msg.acceptTuple
+					highestAcceptVal = msg.acceptVal
+
+			if highestAcceptNum == "0,0": #None of the msgs have acceptNum set already
+				self.acceptTuple = self.ackarray[0].ballot
+				self.acceptVal = self.ackarray[0].acceptVal
+			else: 
+				self.acceptTuple = highestAcceptNum
+				self.acceptVal = highestAcceptVal
+
+			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
+				print ("Sent Accept message to node ", dest_id)
+				msg = Message(self.id, self.ballot, None, self.acceptVal, self.ackarray[0].index, self.ackarray[0].originalPRM, None, Message.ACCEPT)
+				sock.send(str(msg))		
+			
+			cThread = threading.Thread(target = self.checkMajorityAccepts)
+			cThread.daemon = True
+			cThread.start()
+		self.checkingMajorityAcks = False
+
+	def checkMajorityAccepts(self):
+		print "Checking to see if I have Majority Accepts..."
+		time.sleep(0.5)
+		#TODO Check for majorityAccepts
 
 	def incrementBallot(self): 
 		tempBallot = self.ballot.split(",")
@@ -421,67 +432,5 @@ class Prm(object):
 				self.incoming_channels_unordered.append(con)
 			except socket.error:
 				continue           
-
-'''
-	def execute(self, command):
-		self.checkIncomingMsgs()
-		keyWords = command.split()
-		if "send" == keyWords[0]:
-			dest_id = int(keyWords[1])
-			amount = int(keyWords[2])
-			self.sendMoney(dest_id, amount)
-		elif "snapshot" == keyWords[0]:
-			self.startSnapshot()
-		elif "sleep" == keyWords[0]:
-			time = float(keyWords[1])
-			self.sleep(time)
-		else:
-			print "CANNOT RECOGNIZE THE COMMAND: " + command
-			exit(1)
-		self.checkIncomingMsgs()
-
-	def checkIncomingMsgs(self):
-		BUF_SIZE = 1024
-		for con in self.incoming_channels:
-			try:
-				msgs = con.recv(BUF_SIZE)
-				for msg in Message.split(msgs):
-					msg = Message.reconstructFromString(msg.strip())
-					if msg.msgType == Message.MARKER_TYPE:
-						if msg.snap_id not in self.snapID_table: #First Marker -> input into snapID_table
-							counter = 1
-							site_state = self.balance #Take Local State Snapshot
-							incoming_channels_states = copy.deepcopy(self.SnapIDTableLastEntryTemplate)
-							self.snapID_table[msg.snap_id] = [counter, site_state, incoming_channels_states]
-							self.snapID_table[msg.snap_id][2][msg.source_id][0] = True #Shut down the incoming channel of 1st Marker
-							self.sendMarkers(msg.snap_id)
-							if self.snapID_table[msg.snap_id][0] == len(self.incoming_channels): #Received all markers
-								self.outputLocalSnapshotAt(msg.snap_id)
-						else: #Not the first marker
-							self.snapID_table[msg.snap_id][0] += 1 #increase counter by 1
-							self.snapID_table[msg.snap_id][2][msg.source_id][0] = True #Take no more Snapshot on the channel
-							if self.snapID_table[msg.snap_id][0] == len(self.incoming_channels): #Received all markers
-								self.outputLocalSnapshotAt(msg.snap_id)
-					elif msg.msgType == Message.MONEY_TRANSFER_TYPE: #received a msg
-						self.balance += msg.amount #Fix the real-time balance
-						for _, v in self.snapID_table.iteritems():
-							if v[0] == len(self.incoming_channels): #Finished Snapshot
-								continue
-							if v[2][msg.source_id][0] == False: #The current money message is before Marker
-								v[2][msg.source_id][1] += msg.amount #Record the increase in amount
-					elif msg.msgType == Message.DONE_TYPE:
-						#Piggy back ammount as done_process_id
-						done_process_id = msg.amount
-						if done_process_id not in self.done_processes:
-							self.done_processes.add(done_process_id)
-							self.sendDone(done_process_id)
-					else:
-						print "ERROR: DO NOT UNDERSTAND MESSAGE TYPE"
-						print msg
-						exit(1)
-			except socket.error, e:
-				continue
-
-'''
 
 main()
