@@ -69,6 +69,7 @@ def main():
 					continue
 				cli.outgoingSocket.send("replicate " + command.split()[1]) 
 				cli.prmReplicating = True
+				cli.toReplicate = command.split()[1]
 			except:
 				print "USAGE: replicate [filename]. File must exist in folder"
 				continue
@@ -126,9 +127,15 @@ def commThread():
 				time.sleep(1.5)
 				if cli.prmReplicating:
 					print ""
-				cli.prmReplicating = False
-				print "Successfully replicated: index {0} is {1} ".format(splitData[1], splitData[2])
+					if splitData[2] != cli.toReplicate:
+						print "Unsucessful replication.",
+					else:
+						print "Sucessful replication.",
 
+
+				cli.prmReplicating = False
+				print "The file \"{0}\" was decided for index {1}".format(splitData[2], splitData[1])
+				cli.toReplicate = ""
 		except socket.error, e:
 			continue
 
@@ -226,6 +233,7 @@ class Cli(object):
 		self.listeningSocket = None
 
 		self.prmReplicating = False
+		self.toReplicate = ""
 
 	def openListeningSocket(self, IP, port):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

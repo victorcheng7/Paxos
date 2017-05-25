@@ -483,7 +483,7 @@ class Prm(object):
 			time.sleep(randint(10,30)/10.0)
 			self.incrementBallot()
 			print "Reproposing my ballot, no majority accept :("
-			for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
+			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
 				print ("Sending Prepare to node ", dest_id)
 				msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
 				sock.send(str(msg))	
