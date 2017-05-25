@@ -5,7 +5,10 @@ import sys
 import Queue
 import copy
 from random import randint
+'''
+Two kinds  of messages: 
 
+'''
 def main():
 	if(len(sys.argv) != 3):
 		print("USAGE: python [prm_id] [setup_file]")
@@ -117,11 +120,10 @@ def commThread(prm):
 								print "The index you proposed has already been set in the log"
 								#send(prm.id, prm.index, "UPDATE") to msg.originalPRM
 							elif msg.index == prm.index: 
-								prm.log.append(msg.acceptVal) #filename into log
+								prm.addToLog(msg.log, prm.index) #filename into log
 								prm.newRoundCleanUp()
 								#send the cli that you've finished replicating and what the log entry will be
-								prm.cli[1].send("finishReplicating " + str(msg.index) + " " + prm.log[prm.index])
-								prm.index += 1
+								prm.cli[1].send("finishReplicating " + str(msg.index) + " " + prm.log[msg.index])
 
 
 						if msg.msgType == Message.UPDATE:
@@ -207,6 +209,8 @@ def setup(prm, setup_file):
 
 	prm.openIncomingChannels()
 	print "setup finished"
+
+
 
 class Ballot(object):
 	def __init__(self, ballot1, ballot2):
@@ -367,11 +371,12 @@ class Prm(object):
 		time.sleep(0.5)
 		if (len(self.acceptarray) + 1) >= 0.5*(self.num_nodes+1):
 			print "I have majority Acks!"
-			self.log.append(self.proposedFile)
+			self.addToLog(self.proposedFile, self.index)
+			#self.log.append(self.proposedFile)
 			#self.log[self.acceptarray[0].index] = self.proposedFile
 			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a decide message
 				print ("Sent Decide message to node ", dest_id)
-				msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, self.proposedFile, Message.DECIDE)
+				msg = Message(self.id, self.ballot, None, self.proposedFile, self.index -1 , self.id, self.proposedFile, Message.DECIDE)
 				sock.send(str(msg))	
 			self.checkingMajorityAcks = False		
 			self.acceptarray = []
@@ -382,8 +387,7 @@ class Prm(object):
 			sendUpdatesThread.start()
 
 			#Tell the CLI you finished replicating
-			self.cli[1].send("finishReplicating " + str(self.index) + " " + self.log[self.index])
-			self.index += 1
+			self.cli[1].send("finishReplicating " + str(self.index-1) + " " + self.log[self.index-1])
 			self.newRoundCleanUp()
 		else: 
 			time.sleep(randint(10,30)/10.0)
@@ -399,6 +403,22 @@ class Prm(object):
     	#TODO
     	#send all the other nodes an update message saying the index and what log entry to input
     	#Message("UPDATE")
+
+	def addToLog(self, value, index): #only addToLog if there is an out of bounds error
+		try: 
+			self.log[index] = value
+			self.index += 1
+		except Exception: 
+			temp = [None]*(index+5)
+			counter = 0
+			for value in self.log:
+				temp[counter] = value
+				counter += 1
+			temp[index] = value
+			self.log = temp[:]
+			self.index += 1
+
+
 
 	def incrementBallot(self): 
 		tempBallot = self.ballot.split(",")
