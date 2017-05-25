@@ -97,6 +97,8 @@ def commThread():
 	while True:
 		try:
 			data = cli.incomingStream.recv(1024)
+			splitData = data.split(" ")
+
 			#print data
 			if data == "stopped":
 				cli.prmReplicating = False
@@ -106,10 +108,10 @@ def commThread():
 			if data == "finishedSetup":
 				print "setup finished"
 
-			if data == "finishReplicating":
+			if splitData[0] == "finishReplicating":
 				cli.prmReplicating = False
 				time.sleep(1.5)
-				print "done"
+				print "Successfully replicated: index {0} is {1} ".format(splitData[1], splitData[2])
 
 		except socket.error, e:
 			continue

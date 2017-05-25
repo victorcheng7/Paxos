@@ -6,55 +6,6 @@ import Queue
 import copy
 from random import randint
 
-'''
-******************* 
-To help debug, print out every receive and send message and who you're sending to
-States I need to add to PRM - stop/resume, send update messages to all outgoing
-
- if replicate:
-    prm.proposedFile = the second part of the replicate message that was validated by CLI
-    prm.ballot[0] += 1 #change ballot number
-    send all prms Message(prm.ballot, prm.id, index, "PREPARE")
-idea 1- 
-if stop: 
-    tear down all incoming channels, so you can only listen to cmds from CLI
-if resume: 
-    reestablish all connections
-idea 2 - 
-if stop: 
-    Add an extra if statement validation on resume/stop state of PRM on commThread()
-    Any message taken in, don't do anything 
-if resume: 
-    resume as normal inside of commThread
-    if state = replicate: 
-        send proposal to everyone 
-    if state != replicate: 
-        upon receiving a proposal, if index they're proposing > last index in ur array, ask that node for updates
-
-if total, print, merge EASY: 
-    add up total words inside each files 
-
-
-   
-if DECIDE: 
-	if msg.index > prm.index:
-		send(prm.id, prm.index, "UPDATE") to msg.originalPRM
-	prm.log[prm.index] = msg.acceptVal #filename
-	prm.index += 1
-	prm.newRoundCleanUp()
-
-if UPDATE:
-	if msg.index < prm.index:
-		#update msg.source_id
-		counter = msg.index
-		while counter != prm.index + 1: #send all missing log entries one by one
-			send(prm.id, counter, prm.log[counter], "UPDATE") to msg.source_id 
-			counter += 1
-	elif (msg.index > prm.index) and (msg.log != None):
-		#please update me
-		prm.log[msg.index] = msg.log 			
-'''
-
 def main():
 	if(len(sys.argv) != 3):
 		print("USAGE: python [prm_id] [setup_file]")
@@ -91,27 +42,8 @@ def commThread(prm):
 	prm.incoming_channels.pop(prm.cli[0], None)
 	prm.cli[1].send("finishedSetup")
 
-# msg format - def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, type):
-	while True:
-		'''
-		Questions when should you ask for update? and when should you send an update automatically? Look at every mendMessage, sendPrepare, etc.
-		when should you send each message? prepare only after replicating. when would you receive a message? only receive prepare if a node wants
-		to propose a value
-		
-		def sendDecide(self, dest_id):
-			#TODO when constructing message object, originalPRM should be msg.originalPRM
-			send CLI that you've decided on a value and what is it
-		def sendUpdate(self, dest_id):
-			#TODO when constructing message object, originalPRM should be None
-		def checkMajorityAcks(self, msg):
-			time.sleep(.4)
-			#TODO checks to see if !majority accepts, repropose with time.sleep(random)
-		def checkMajorityAccepts(self, msg):
-			time.sleep(.4)
-			#TODO checks to see if !majority acks, reproposes with time.sleep(random)
-		Message(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, type):
 
-		'''
+	while True:
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
 				data = con.recv(1024)
@@ -122,24 +54,25 @@ def commThread(prm):
 
 						if msg.msgType == Message.PREPARE:
 							print ("Received Prepare Message from ", msg.source_id, msg.ballot, msg.index, msg.originalPRM, msg.msgType)
-							'''
+							
 							if msg.index < prm.index: #update source_id with missing log entries
-								TODO update Moduralize? send("update", log entries and corresponding index) to msg.source_id
-   							'''
-   							msgBallotTuple = msg.ballot.split(",") # ex "1,0"
-   							prmBallotTuple = prm.ballot.split(",") # ex. "1,0"
-   							if ((msgBallotTuple[0] > prmBallotTuple[0]) or ((msgBallotTuple[0] == prmBallotTuple[0]) and (msgBallotTuple[1] > prmBallotTuple))):
-							    	'''
-								        if index of proposal > prm.index: #ask for update from source_id, cause you have missing log entries
-											#TODO send("update", log entries and corresponding index) to msg.source_id
-								        if index of proposal < prm.index: 
-							            	#update the source_id all the entries in the log before the proposal
-					           		'''
-						   		prm.ballot = msg.ballot
-						   		print "this is originalPRM", msg.originalPRM
-								ackMsg = Message(prm.id, prm.ballot, prm.acceptTuple, msg.acceptVal, prm.index, msg.originalPRM, None, Message.ACK)
-								prm.outgoing_channels[msg.source_id].send(str(ackMsg)) #send prepare message to original proposer
-						    	print ("Sent Ack message to node ", dest_id)
+								print "The index you proposed has already been set in the log"
+								#TODO update and ask to repropose another prepare message with incrementBallotNumber-- send("update", log entries and corresponding index) to msg.source_id
+   							else:
+	   							msgBallotTuple = msg.ballot.split(",") # ex "1,0"
+	   							prmBallotTuple = prm.ballot.split(",") # ex. "1,0"
+	   							if ((msgBallotTuple[0] > prmBallotTuple[0]) or ((msgBallotTuple[0] == prmBallotTuple[0]) and (msgBallotTuple[1] > prmBallotTuple))):
+								    	'''
+									        if index of proposal > prm.index: #ask for update from source_id, cause you have missing log entries
+												#TODO send("update", log entries and corresponding index) to msg.source_id
+									        if index of proposal < prm.index: 
+								            	#update the source_id all the entries in the log before the proposal
+						           		'''
+							   		prm.ballot = msg.ballot
+							   		print "this is originalPRM", msg.originalPRM
+									ackMsg = Message(prm.id, prm.ballot, prm.acceptTuple, msg.acceptVal, prm.index, msg.originalPRM, None, Message.ACK)
+									prm.outgoing_channels[msg.source_id].send(str(ackMsg)) #send prepare message to original proposer
+							    	print ("Sent Ack message to node ", dest_id)
 
 						if msg.msgType == Message.ACK:
 							print ("Received ACK Message from ", msg.source_id, msg.ballot, prm.acceptTuple, prm.acceptVal, msg.index, msg.originalPRM, msg.log, msg.msgType)
@@ -153,45 +86,58 @@ def commThread(prm):
 								prm.ackarray.append(msg)
 
 						if msg.msgType == Message.ACCEPT:
-							'''
-							  if msg.index > prm.index: 
-							       	send(prm.id, None, None, None, None, None, None, "UPDATE") #Ask for entire log
-							    if msg.ballot >= prm.ballot: 
-							        prm.acceptTuple = msg.acceptTuple 
-							        prm.acceptVal = msg.acceptVal
-							        for all outgoing channels:
-							            send(prm.id, prm.ballot, None, prm.acceptVal, prm.index,  "ACCEPT")
-							        if msg.originalPRM == prm.id: 
-							            prm.numAccepts += 1
-							        if prm.numAccepts >= upper(prm.num_nodes/2): 
-							            log[msg.index] = prm.proposedFile
-							            for all outgoing channels: 
-							                send(prm.id, None, None, prm.proposedFile, prm.index, msg.originalPRM, None, "DECIDE")
-							            send("finished with replicate and your file successfully added to log") to CLI
-							    if it's the first time receiving accept for a given ballot number, send to all other num_nodes
-							    otherwise don't send anything
-						    '''
 							print "inside of Message.ACCEPT receive"
-							if prm.id == msg.originalPRM: #Am I the original proposer?
-							#leftoff
+							if prm.id == msg.originalPRM: #Am I the original proposer?, check for majority Accepts
 								if not prm.checkingMajorityAccepts:
 									prm.checkingMajorityAccepts = True
-									prm.acceptarray.append(msg)
-
 									majorityAcceptThread = threading.Thread(target=prm.checkMajorityAccepts)
 									majorityAcceptThread.daemon = True
 									majorityAcceptThread.start()
-								else:
-									prm.acceptarray.append(msg)
-							#send all outgoing channels same accept message, relay it. if it's the first time receiving it
-
+								prm.acceptarray.append(msg)
+							else: #you're not the original Proposer
+								if msg.index > prm.index: 
+									print "you should update the original node missing log entries"
+									#send(prm.id, None, None, None, None, None, None, "UPDATE") #Ask for entire log TOOD
+								elif msg.index == prm.index:
+									if (msg.ballot >= prm.ballot) and (msg.ballot not in prm.seenballotarray): #first time, relay message
+										prm.acceptTuple = msg.ballot 
+										prm.acceptVal = msg.acceptVal
+										prm.seenballotarray.append(msg.ballot)
+										print ("Relay Accept message to all other nodes")
+										for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
+											msg = Message(prm.id, prm.ballot, None, prm.acceptVal, msg.index, msg.originalPRM, None, Message.ACCEPT)
+											sock.send(str(msg))	
+											print ("Sent Accept message to node ", dest_id)
+							        
+							
 						if msg.msgType == Message.DECIDE:
 							print "inside of Message.DECIDE receive"
-							#send message back to CLI that the value has been decided
-							#spawn a new thread that periodically sends updates
+							
+							if msg.index > prm.index:
+								print "The index you proposed has already been set in the log"
+								#send(prm.id, prm.index, "UPDATE") to msg.originalPRM
+							elif msg.index == prm.index: 
+								prm.log.append(msg.acceptVal) #filename into log
+								prm.newRoundCleanUp()
+								#send the cli that you've finished replicating and what the log entry will be
+								prm.cli[1].send("finishReplicating " + str(msg.index) + " " + prm.log[prm.index])
+								prm.index += 1
+
+
 						if msg.msgType == Message.UPDATE:
+							if msg.index < prm.index:
+								#"update" msg.source_id log entries its missing
+								counter = msg.index
+								while counter != prm.index + 1: #send all missing log entries one by one
+									#send(prm.id, counter, prm.log[counter], "UPDATE") to msg.source_id 
+									counter += 1
+							elif (msg.index > prm.index) and (msg.log != None):
+								#please update me
+								prm.log[msg.index] = msg.log 	
 							#once you updated your log, send back the update source_id that you've completed and stop sending once everyone is updated
+							#If you successfully updated your log and you received a message saying what you should update, send back to source_id, so they know when to sotp sending to everyone
 							#keep track of a local array in the update thread
+							#Message(Update) originalPRM should be none
 							print "inside of Message.UPDATE receive"
 
 			except socket.error, e:
@@ -222,7 +168,8 @@ def commThread(prm):
 				#for dest_id, sock in prm.outgoing_channels.iteritems():
 					#sendUpdate(everything in message)
 				#send a message to all PRMs asking for updates
-
+			elif data == "total":
+				print "inside total"
 			else:
 				prm.cli[1].send("stopped")
 		except socket.error, e:
@@ -320,6 +267,10 @@ class Message(object):
 		if msgType == Message.ACCEPT:
 			acceptVal = keyWords[4]
 			originalPRM = int(keyWords[5])
+		if msgType == Message.DECIDE:
+			acceptVal = keyWords[4]
+			originalPRM = keyWords[5]
+			log = keyWords[6]
 		if msgType == Message.UPDATE:
 			log = str(keyWords[4])
 		return Message(source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, msgType)
@@ -352,18 +303,22 @@ class Prm(object):
 		self.index = 0
 		self.ackarray = []
 		self.acceptarray = []
+		self.seenballotarray = [] #have you seen this ballot in an accept message before?
 		self.checkingMajorityAcks = False
 		self.checkingMajorityAccepts = False
 		self.log = []
 
 	def newRoundCleanUp(self):
 		self.proposedFile = None
-		self.ballot = "0," + str(site_id) 
+		self.ballot = "0," + str(self.id) 
 		#self.ballot = [0, site_id]
 		self.acceptTuple = "0,0"
-		self.acceptVal = None
+		self.acceptVal = "-1"
 		self.ackarray = []
 		self.acceptarray = []
+		self.seenballotarray = [] #have you seen this ballot in an accept message before?
+		self.checkingMajorityAcks = False
+		self.checkingMajorityAccepts = False
 
 	def stop():
 		self.listening = False
@@ -393,7 +348,7 @@ class Prm(object):
 				self.acceptTuple = highestAcceptNum
 				self.acceptVal = highestAcceptVal
 
-			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
+			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an accept message
 				print ("Sent Accept message to node ", dest_id)
 				msg = Message(self.id, self.ballot, None, self.acceptVal, self.ackarray[0].index, self.ackarray[0].originalPRM, None, Message.ACCEPT)
 				sock.send(str(msg))	
@@ -405,12 +360,45 @@ class Prm(object):
 				msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
 				sock.send(str(msg))			
 		self.checkingMajorityAcks = False
+		self.ackarray = []
 
 	def checkMajorityAccepts(self):
 		print "Checking to see if I have Majority Accepts..."
 		time.sleep(0.5)
-		#TODO Check for majorityAccepts
-	    #Repropose ballot if you didn't receive majority accepts
+		if (len(self.acceptarray) + 1) >= 0.5*(self.num_nodes+1):
+			print "I have majority Acks!"
+			self.log.append(self.proposedFile)
+			#self.log[self.acceptarray[0].index] = self.proposedFile
+			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a decide message
+				print ("Sent Decide message to node ", dest_id)
+				msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, self.proposedFile, Message.DECIDE)
+				sock.send(str(msg))	
+			self.checkingMajorityAcks = False		
+			self.acceptarray = []
+
+		    #periodically send updates to all other nodes
+			sendUpdatesThread = threading.Thread(target = self.sendUpdates)
+			sendUpdatesThread.daemon = True
+			sendUpdatesThread.start()
+
+			#Tell the CLI you finished replicating
+			self.cli[1].send("finishReplicating " + str(self.index) + " " + self.log[self.index])
+			self.index += 1
+			self.newRoundCleanUp()
+		else: 
+			time.sleep(randint(10,30)/10.0)
+			self.incrementBallot()
+			print "Reproposing my ballot, no majority accept :("
+			for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
+				print ("Sending Prepare to node ", dest_id)
+				msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
+				sock.send(str(msg))	
+
+	def sendUpdates(self):
+		print "Inside of sendUpdates"
+    	#TODO
+    	#send all the other nodes an update message saying the index and what log entry to input
+    	#Message("UPDATE")
 
 	def incrementBallot(self): 
 		tempBallot = self.ballot.split(",")
