@@ -21,6 +21,7 @@ def main():
 		exit(1)
 	prm_id = int(sys.argv[1])
 	prm = Prm(prm_id)
+	print "I am PRM {0}".format(prm_id)
 	setup_file = sys.argv[2]
 	setup(prm, setup_file)
 
@@ -73,10 +74,10 @@ def commThread(prm):
 								TODO send all the updates 
 								ask to repropose another prepare message with incrementBallotNumber-- send("update", log entries and corresponding index) to msg.source_id
 								'''
-   							else:
-	   							msgBallotTuple = msg.ballot.split(",") # ex "1,0"
-	   							prmBallotTuple = prm.ballot.split(",") # ex. "1,0"
-	   							if ((msgBallotTuple[0] > prmBallotTuple[0]) or ((msgBallotTuple[0] == prmBallotTuple[0]) and (msgBallotTuple[1] > prmBallotTuple))): #is ballot > local ballot
+							else:
+								msgBallotTuple = msg.ballot.split(",") # ex "1,0"
+								prmBallotTuple = prm.ballot.split(",") # ex. "1,0"
+								if ((msgBallotTuple[0] > prmBallotTuple[0]) or ((msgBallotTuple[0] == prmBallotTuple[0]) and (msgBallotTuple[1] > prmBallotTuple))): #is ballot > local ballot
 									if msg.index > prm.index: #ask for update from source_id, cause you have missing log entries
 										print "Askin for update from node {0}".format(msg.source_id)
 										counter = prm.index
@@ -84,10 +85,10 @@ def commThread(prm):
 											tempMsg = Message(prm.id, prm.ballot, None, None, counter, None, None, Message.NEEDUPDATE) 
 											prm.outgoing_channels[msg.source_id].send(str(tempMsg))
 											counter += 1
-							   		prm.ballot = msg.ballot
+									prm.ballot = msg.ballot
 									ackMsg = Message(prm.id, prm.ballot, prm.acceptTuple, msg.acceptVal, prm.index, msg.originalPRM, None, Message.ACK)
 									prm.outgoing_channels[msg.source_id].send(str(ackMsg)) #send prepare message to original proposer
-							    	print ("Sent Ack message to node ", dest_id)
+									print ("Sent Ack message to node ", dest_id)
 
 
 						if msg.msgType == Message.ACK:
@@ -129,7 +130,7 @@ def commThread(prm):
 											msg = Message(prm.id, prm.ballot, None, prm.acceptVal, msg.index, msg.originalPRM, None, Message.ACCEPT)
 											sock.send(str(msg))	
 											print ("Sent Accept message to node ", dest_id)
-							        
+									
 							
 						if msg.msgType == Message.DECIDE:
 							print "inside of Message.DECIDE receive"
@@ -172,16 +173,86 @@ def commThread(prm):
 				print "received {0} from cli".format(data)
 				if splitData[0] == "replicate": #ex. replicate words.txt
 					time.sleep(1)
-					prm.isReplicating = True
 					prm.proposedFile = splitData[1]
 					prm.incrementBallot()
 					for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
 						print ("Sent Prepare message to node ", dest_id)
 						msg = Message(prm.id, prm.ballot, None, prm.proposedFile, prm.index, prm.id, None, Message.PREPARE)
-						sock.send(str(msg))						
+						sock.send(str(msg))                     
 				elif data == "stop":
 					print "Stopping PRM"
 					prm.listening = False
+
+				elif data == "print":
+					print "Replicated Log"
+					print "---------------------"
+					for idx, val in enumerate(prm.log):
+						print "Index {0} : {1}".format(idx, val)
+
+				elif splitData[0] == "total":
+					pos1 = int(splitData[1])
+					pos2 = int(splitData[2])
+					count = 0
+					try:
+
+						file1 = open(prm.log[pos1], "r")
+						file2 = open(prm.log[pos2], "r")
+
+
+						for line in file1:
+							count += int(line.strip('\n\r').split()[1])
+
+						for line2 in file2:
+							count += int(line2.strip('\n\r').split()[1])
+						#TODO check to see if file is reduced file
+
+						print "Total word count at index {0}(\"".format(pos1) + prm.log[pos1] + "\") and index {0}(\"".format(pos2) + prm.log[pos2] + "\") is {0}".format(count)
+						file1.close()
+						file2.close()
+					except:
+						print "Error: Invalid index"
+
+				elif splitData[0] == "merge":
+					pos1 = int(splitData[1])
+					pos2 = int(splitData[2])
+					word_dict = {}
+
+					try:
+						file1 = open(prm.log[pos1], "r")
+						file2 = open(prm.log[pos2], "r")
+
+						for line in file1:
+							lineSplit = line.strip('\n\r').split()
+
+							word = lineSplit[0]
+							count = int(lineSplit[1])
+
+							if word in word_dict:
+								word_dict[word] += count
+							else:
+								word_dict[word] = count
+
+						for line2 in file2:
+							lineSplit2 = line2.strip('\n\r').split()
+
+							word2 = lineSplit2[0]
+							count2 = int(lineSplit2[1])
+
+							if word2 in word_dict:
+								word_dict[word2] += count2
+							else:
+								word_dict[word2] = count2
+
+						print "Word List"
+						print "---------------------"
+
+						for key, val in word_dict.iteritems():
+							print "{0} {1}".format(key, val)
+
+						file1.close()
+						file2.close()
+					except:
+						print "Error: Invalid index"
 
 			elif data == "resume":
 				print "Resuming PRM"
@@ -189,8 +260,7 @@ def commThread(prm):
 				#for dest_id, sock in prm.outgoing_channels.iteritems():
 					#sendUpdate(everything in message)
 				#send a message to all PRMs asking for updates
-			elif data == "total":
-				print "inside total"
+			
 			else:
 				prm.cli[1].send("stopped")
 		except socket.error, e:
@@ -200,7 +270,6 @@ def setup(prm, setup_file):
 	#Read setup file. ex - setup.txt  
 	with open(setup_file, 'r') as f:
 	  N = int(f.readline().strip())
-	  print N
 	  prm.num_nodes = N
 	  process_id = 0
 	  for line in f.readlines():
@@ -380,7 +449,7 @@ class Prm(object):
 		else: 
 			time.sleep(randint(10,30)/10.0)
 			self.incrementBallot()
-			for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
+			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
 				print ("Sending Repropose to node ", dest_id)
 				msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
 				sock.send(str(msg))			
@@ -402,7 +471,7 @@ class Prm(object):
 			self.checkingMajorityAcks = False		
 			self.acceptarray = []
 
-		    #periodically send updates to all other nodes
+			#periodically send updates to all other nodes
 			sendUpdatesThread = threading.Thread(target = self.sendUpdates, args=(self.index-1,))
 			sendUpdatesThread.daemon = True
 			sendUpdatesThread.start()

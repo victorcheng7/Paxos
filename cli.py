@@ -26,42 +26,44 @@ def main():
 	# make prm connect to all other prms to confirm initialization
 	cli.outgoingSocket.send("confirmInit")
 
-	print "I am cli {0}".format(cli_id)
+	print "I am CLI {0}".format(cli_id)
 	while True:
 		
 		if cli.prmReplicating:
 			sys.stdout.write("PRM in the middle of replicating")
 			while cli.prmReplicating:
+				sys.stdout.write(".")
 				sys.stdout.flush()
 				time.sleep(1)
-				sys.stdout.write(".")
+				
 			tcflush(sys.stdin, TCIFLUSH)
 			
 		command = None
 		# make sure command not empty
 		while not command:
 			command = raw_input()
+			splitCommand = command.split()
 
-		if command.split()[0] == "map":
+		if splitCommand[0] == "map" and len(splitCommand) == 2:
 			try:
-				validFile(command.split()[1])
+				validFile(splitCommand[1])
 			except:
 				print "USAGE: map [filename]. File must exist in folder"
 				continue
 			print "map"
 
-		elif command.split()[0] == "reduce":
+		elif splitCommand[0] == "reduce" and len(splitCommand) == 3:
 			try:
-				validFile(command.split()[1])
-				validFile(command.split()[2])
+				validFile(splitCommand[1])
+				validFile(splitCommand[2])
 			except:
 				print "USAGE: reduce [filename1] [filename2]. Files must exist in folder"
 				continue
 			print "reduce"
 
-		elif command.split()[0] == "replicate":
+		elif splitCommand[0] == "replicate" and len(splitCommand) == 2:
 			try:
-				validFile(command.split()[1])
+				validFile(splitCommand[1])
 				validContents = checkIsReducedFile(command.split()[1])
 				if not validContents:
 					continue
@@ -71,11 +73,24 @@ def main():
 				print "USAGE: replicate [filename]. File must exist in folder"
 				continue
 
-		elif command.split()[0] == "stop":
+		elif splitCommand[0] == "stop" and len(splitCommand) == 1:
 			cli.outgoingSocket.send("stop")
 
-		elif command.split()[0] == "resume":
+		elif splitCommand[0] == "resume" and len(splitCommand) == 1:
 			cli.outgoingSocket.send("resume")	
+
+		elif splitCommand[0] == "print" and len(splitCommand) == 1:
+			cli.outgoingSocket.send("print")
+
+		elif (splitCommand[0] == "merge" or splitCommand[0] == "total") and len(splitCommand) == 3:
+			try:
+				pos1 = int(splitCommand[1])
+				pos2 = int(splitCommand[2])
+				cli.outgoingSocket.send("{0} {1} {2}".format(splitCommand[0], pos1, pos2))
+			
+			except:
+				print "Error: arguments must be valid integers"
+				continue
 
 		else:
 			print ""
@@ -91,7 +106,6 @@ def main():
 			print "merge [pos1] [pos2]"
 			print "--------------------------------"
 			print ""
-
 def commThread():
 
 	while True:
@@ -109,8 +123,10 @@ def commThread():
 				print "setup finished"
 
 			if splitData[0] == "finishReplicating":
-				cli.prmReplicating = False
 				time.sleep(1.5)
+				if cli.prmReplicating:
+					print ""
+				cli.prmReplicating = False
 				print "Successfully replicated: index {0} is {1} ".format(splitData[1], splitData[2])
 
 		except socket.error, e:
