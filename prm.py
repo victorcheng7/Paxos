@@ -4,6 +4,7 @@ import threading
 import sys
 import Queue
 import copy
+from random import randint
 
 '''
 ******************* 
@@ -34,24 +35,7 @@ if total, print, merge EASY:
     add up total words inside each files 
 
 
-if ACCEPT: 
-    if msg.index > prm.index: 
-       	send(prm.id, None, None, None, None, None, None, "UPDATE") #Ask for entire log
-    if msg.ballot >= prm.ballot: 
-        prm.acceptTuple = msg.acceptTuple 
-        prm.acceptVal = msg.acceptVal
-        for all outgoing channels:
-            send(prm.id, prm.ballot, None, prm.acceptVal, prm.index,  "ACCEPT")
-        if msg.originalPRM == prm.id: 
-            prm.numAccepts += 1
-        if prm.numAccepts >= upper(prm.num_nodes/2): 
-            log[msg.index] = prm.proposedFile
-            for all outgoing channels: 
-                send(prm.id, None, None, prm.proposedFile, prm.index, msg.originalPRM, None, "DECIDE")
-            send("finished with replicate and your file successfully added to log") to CLI
-    if it's the first time receiving accept for a given ballot number, send to all other num_nodes
-    otherwise don't send anything
-    
+   
 if DECIDE: 
 	if msg.index > prm.index:
 		send(prm.id, prm.index, "UPDATE") to msg.originalPRM
@@ -114,8 +98,6 @@ def commThread(prm):
 		when should you send each message? prepare only after replicating. when would you receive a message? only receive prepare if a node wants
 		to propose a value
 		
-		def sendAccept(self, dest_id):
-			#TODO when constructing message object, originalPRM should be msg.originalPRM
 		def sendDecide(self, dest_id):
 			#TODO when constructing message object, originalPRM should be msg.originalPRM
 			send CLI that you've decided on a value and what is it
@@ -171,12 +153,45 @@ def commThread(prm):
 								prm.ackarray.append(msg)
 
 						if msg.msgType == Message.ACCEPT:
-							#send all outgoing channels same accept message, relay it. if it's the first time receiving it
+							'''
+							  if msg.index > prm.index: 
+							       	send(prm.id, None, None, None, None, None, None, "UPDATE") #Ask for entire log
+							    if msg.ballot >= prm.ballot: 
+							        prm.acceptTuple = msg.acceptTuple 
+							        prm.acceptVal = msg.acceptVal
+							        for all outgoing channels:
+							            send(prm.id, prm.ballot, None, prm.acceptVal, prm.index,  "ACCEPT")
+							        if msg.originalPRM == prm.id: 
+							            prm.numAccepts += 1
+							        if prm.numAccepts >= upper(prm.num_nodes/2): 
+							            log[msg.index] = prm.proposedFile
+							            for all outgoing channels: 
+							                send(prm.id, None, None, prm.proposedFile, prm.index, msg.originalPRM, None, "DECIDE")
+							            send("finished with replicate and your file successfully added to log") to CLI
+							    if it's the first time receiving accept for a given ballot number, send to all other num_nodes
+							    otherwise don't send anything
+						    '''
 							print "inside of Message.ACCEPT receive"
+							if prm.id == msg.originalPRM: #Am I the original proposer?
+							#leftoff
+								if not prm.checkingMajorityAccepts:
+									prm.checkingMajorityAccepts = True
+									prm.acceptarray.append(msg)
+
+									majorityAcceptThread = threading.Thread(target=prm.checkMajorityAccepts)
+									majorityAcceptThread.daemon = True
+									majorityAcceptThread.start()
+								else:
+									prm.acceptarray.append(msg)
+							#send all outgoing channels same accept message, relay it. if it's the first time receiving it
+
 						if msg.msgType == Message.DECIDE:
 							print "inside of Message.DECIDE receive"
-							#send message back to CLI that the value has been decided.. if msg is decide
+							#send message back to CLI that the value has been decided
+							#spawn a new thread that periodically sends updates
 						if msg.msgType == Message.UPDATE:
+							#once you updated your log, send back the update source_id that you've completed and stop sending once everyone is updated
+							#keep track of a local array in the update thread
 							print "inside of Message.UPDATE receive"
 
 			except socket.error, e:
@@ -381,17 +396,21 @@ class Prm(object):
 			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
 				print ("Sent Accept message to node ", dest_id)
 				msg = Message(self.id, self.ballot, None, self.acceptVal, self.ackarray[0].index, self.ackarray[0].originalPRM, None, Message.ACCEPT)
-				sock.send(str(msg))		
-			
-			cThread = threading.Thread(target = self.checkMajorityAccepts)
-			cThread.daemon = True
-			cThread.start()
+				sock.send(str(msg))	
+		else: 
+			time.sleep(randint(10,30)/10.0)
+			self.incrementBallot()
+			for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
+				print ("Sending Repropose to node ", dest_id)
+				msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
+				sock.send(str(msg))			
 		self.checkingMajorityAcks = False
 
 	def checkMajorityAccepts(self):
 		print "Checking to see if I have Majority Accepts..."
 		time.sleep(0.5)
 		#TODO Check for majorityAccepts
+	    #Repropose ballot if you didn't receive majority accepts
 
 	def incrementBallot(self): 
 		tempBallot = self.ballot.split(",")
