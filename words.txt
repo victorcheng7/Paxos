@@ -1,3 +1,6 @@
+replicate Reduced/f1_reduced.txt
+replicate Reduced/f2_reduced.txt
+replicate Reduced/f3_reduced.txt
 dtssqji
 lwocoeq
 xxqdbqd
