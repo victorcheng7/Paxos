@@ -27,8 +27,9 @@ def main():
 	cli.outgoingSocket.send("confirmInit")
 
 	print "I am CLI {0}".format(cli_id)
+	time.sleep(1.5)
 	while True:
-		
+
 		if cli.prmReplicating:
 			sys.stdout.write("PRM in the middle of replicating")
 			while cli.prmReplicating:
@@ -37,11 +38,11 @@ def main():
 				time.sleep(1)
 				
 			tcflush(sys.stdin, TCIFLUSH)
-			
+		
 		command = None
 		# make sure command not empty
 		while not command:
-			command = raw_input()
+			command = raw_input("[CLI]$ ")
 			splitCommand = command.split()
 
 		if splitCommand[0] == "map" and len(splitCommand) == 2:
