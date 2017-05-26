@@ -84,12 +84,26 @@ def main():
 		elif splitCommand[0] == "print" and len(splitCommand) == 1:
 			cli.outgoingSocket.send("print")
 
-		elif (splitCommand[0] == "merge" or splitCommand[0] == "total") and len(splitCommand) == 3:
+		elif splitCommand[0] == "merge" and len(splitCommand) == 3:
 			try:
-				pos1 = int(splitCommand[1])
-				pos2 = int(splitCommand[2])
+				pos1 = abs(int(splitCommand[1]))
+				pos2 = abs(int(splitCommand[2]))
 				cli.outgoingSocket.send("{0} {1} {2}".format(splitCommand[0], pos1, pos2))
 			
+			except:
+				print "Error: arguments must be valid integers"
+				continue
+
+		elif splitCommand[0] == "total" and len(splitCommand) > 1:
+
+			try:
+				message = "total"
+				for num in splitCommand[1:]:
+					pos = abs(int(num))
+					message += " {0}".format(pos)
+
+				cli.outgoingSocket.send(message)
+
 			except:
 				print "Error: arguments must be valid integers"
 				continue
@@ -99,12 +113,12 @@ def main():
 			print "Valid cli commands:"
 			print "--------------------------------"
 			print "map [filename]"
-			print "reduce [filename1] [filename2]"
+			print "reduce [filename1] [filename2] ..."
 			print "replicate [filename]"
 			print "stop"
 			print "resume"
 			print "print"
-			print "total [pos1] [pos2]"
+			print "total [pos1] [pos2] ..."
 			print "merge [pos1] [pos2]"
 			print "--------------------------------"
 			print ""
