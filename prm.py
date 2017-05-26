@@ -6,15 +6,6 @@ import Queue
 import copy
 from random import randint
 
-'''
-	cases: 
-	send prepare message for index that's already there
-
-	Need update: Message(prm.id, ballot, None, None, prm.index, None, None, Message.NEEDUPDATE)
-	Updating: Message(prm.id, ballot, None, None, msg.index, None, prm.log[msg.index], Message.UPDATE) 
-	either msg.index or prm.index when updating all the other values
-'''
-
 def main():
 	if(len(sys.argv) != 3):
 		print("USAGE: python [prm_id] [setup_file]")
@@ -97,6 +88,7 @@ def commThread(prm):
 
 						if msg.msgType == Message.ACK:
 							print ("Received ACK Message from ", msg.source_id, msg.ballot, prm.acceptTuple, prm.acceptVal, msg.index, msg.originalPRM, msg.log, msg.msgType)
+							prm.numAckMessages += 1
 							if not prm.checkingMajorityAcks: 
 								prm.checkingMajorityAcks = True
 								prm.ackarray.append(msg)
@@ -163,7 +155,7 @@ def commThread(prm):
 						'''
 
 						if msg.msgType == Message.UPDATE:
-							print "Updated message received"
+							#print "Updated message received"
 							if msg.log[msg.index] == None: #updated message received
 								prm.addToLog(msg.log, msg.index)
 								#once you updated your log, send back the update source_id that you've completed and stop sending once everyone is updated, prm.updatedarray keep track of state on how many are updated
@@ -184,7 +176,11 @@ def commThread(prm):
 					for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
 						print ("Sent Prepare message to node ", dest_id)
 						msg = Message(prm.id, prm.ballot, None, prm.proposedFile, prm.index, prm.id, None, Message.PREPARE)
-						sock.send(str(msg))                     
+						sock.send(str(msg)) 
+						checkNumAckMessages = threading.Thread(target = prm.checkNumAckMessages)
+						checkNumAckMessages.daemon = True
+						checkNumAckMessages.start()
+
 				elif data == "stop":
 					print "Stopping PRM"
 					prm.listening = False
@@ -210,7 +206,6 @@ def commThread(prm):
 
 						for line2 in file2:
 							count += int(line2.strip('\n\r').split()[1])
-						#TODO check to see if file is reduced file
 
 						print "Total word count at index {0}(\"".format(pos1) + prm.log[pos1] + "\") and index {0}(\"".format(pos2) + prm.log[pos2] + "\") is {0}".format(count)
 						file1.close()
@@ -304,14 +299,6 @@ def setup(prm, setup_file):
 	prm.openIncomingChannels()
 	print "setup finished"
 
-
-
-class Ballot(object):
-	def __init__(self, ballot1, ballot2):
-		self.ballot1 = ballot1
-		self.ballot2 = ballot2
-
-
 class Message(object):
 	PREPARE = 0
 	ACK = 1
@@ -393,6 +380,7 @@ class Prm(object):
 		self.listening = True
 		self.done_processes = set()
 
+		self.numAckMessages = 0
 		self.isReplicating = False
 		self.proposedFile = None
 		self.num_nodes = 0
@@ -499,10 +487,19 @@ class Prm(object):
 		while True:
 			time.sleep(0.05)
 			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an update message
-				print ("Sending Update Message to node ", dest_id)
+				#print ("Sending Update Message to node ", dest_id)
 				msg = Message(self.id, self.ballot, None, None, index, None, self.log[index], Message.UPDATE)
 				sock.send(str(msg))	    	
 		
+	def checkNumAckMessages(self):
+		time.sleep(0.4)
+		while (self.numAckMessages + 1) < 0.5*(self.num_nodes+1):
+			time.sleep(0.1)
+			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an prepare message
+				print ("Trying to send Prepare message to node ", dest_id)
+				msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
+				sock.send(str(msg))	  
+
 
 	def addToLog(self, value, index): #only addToLog if there is an out of bounds error
 		try: 

@@ -1,30 +1,46 @@
-# GlobalSnapshot
-CS171 Assignment Global Snapshot
----
+# Paxos
 
-## TO DO:
-  * ~~Fix testOutput script to adapt to this task~~
-  * ~~Fix run.sh script to adapt to this task~~
-  * ~~Adding the snap_id hashtable for the algorithm~~
-  * ~~Handle the error of processes finishing faster before all other processes finish setting up~~
-  * ~~Handdle the error of having more messages in Queue than Buffer Size Allow~~
+To run:
 
----
+#shortcut get started
+run ./test.sh to auto-start 3 CLIs and 3 PRMs
+wait for "setup finished" and run "replicate Reduced/[reduced_file]" in any CLI terminal to start Paxos 
 
-## TO RUN:
-There are 2 files that will execute for you:
-  1. `./run.sh`: This script will run all test suite in tests subdirectory and tell you whether they pass or not. If failed, an expected vs. output will be printed
-  2. `./run_debug`: There are 3 ways of runing this script
-     * `./run_debug`: Run this script with no argument will run all the test suites in tests subdirectory and output the debug log of each site onto the screen
-     * `./run_debug [test_suite_directory]`: Run the test suite at the `[test_suite_directory]` and output the debug log of each site onto the screen
-       * E.g: `./run_debug tests/test1/`
-     * `./run_debug [test_suite_number]`: Run the test suite with the number specified and output the debug log of each site onto the screen (Behaved same as the above)
-       * E.g: `./run_debug 1`
 
----
+manual execution
+1) Create setup file in this format:
 
-To run: 
-1) Create setup file and command file, then run this for every process
-./asg2 [site_id] [setup_file] [command_file]
+[numNodes]
+[cli_IP cli_Port prm_IP prm_Port] #write numNodes lines of these 
 
-Author: Thien Hoang (7832413), Victor Cheng (3900552)
+example :
+2
+127.0.0.1 5001 127.0.0.1 5002  
+127.0.0.1 5101 127.0.0.1 5102
+
+
+2) open [numNodes] CLIs and PRMs in separate terminal windows using:
+
+	python prm.py [nodeID] [setup_file]
+	python cli.py [nodeID] [setup_file]
+
+
+3) wait for all windows to display "setup finished"
+
+4) now you can type these commands into any CLI window:
+
+	map [filename]
+	reduce [filename1] [filename2]
+	replicate [filename]
+	stop
+	resume
+	print
+	total [pos1] [pos2]
+	merge [pos1] [pos2]
+
+   map, reduce, total, and merge do not currently function
+
+Author: Samuel Chu (7651706), Victor Cheng (3900552)
+
+
+
