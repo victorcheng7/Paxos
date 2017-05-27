@@ -21,8 +21,12 @@ example :
 
 2) open [numNodes] CLIs and PRMs in separate terminal windows using:
 
-	python prm.py [nodeID] [setup_file]
-	python cli.py [nodeID] [setup_file]
+	python prm.py [nodeID] [setup_file] OR ./prm [nodeID] [setup_file] 
+	python cli.py [nodeID] [setup_file] OR ./cli [nodeID] [setup_file]
+
+	*** Example with built in setup files for 3 prms and 3 clis: 
+	./prm 1 setup2.txt
+	./cli 1 setup2.txt
 
 
 3) wait for all windows to display "setup finished"
