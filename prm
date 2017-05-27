@@ -488,15 +488,17 @@ class Prm(object):
 	def checkHeartBeat(self):
 		time.sleep(0.4)
 		counter = 0
-		while (counter) < 0.5*(self.num_nodes+1):
-			counter = 0
-			for alive in self.heartBeat:
-				if alive:
-					counter += 1
-			time.sleep(0.1)
-			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
-				msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
-				sock.send(str(msg))	  
+		if not self.isDecided:
+			while (counter) < 0.5*(self.num_nodes+1):
+				counter = 0
+				for alive in self.heartBeat:
+					if alive:
+						counter += 1
+				time.sleep(0.1)
+				if not self.isDecided:
+					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
+						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
+						sock.send(str(msg))	  
 
 
 	def addToLog(self, value, index): #if get an update with higher index than your log, resize
