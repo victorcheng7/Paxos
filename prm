@@ -171,7 +171,7 @@ def commThread(prm):
 					for idx, val in enumerate(prm.log):
 						if val != None:
 							print "Index {0} : {1}".format(idx, val)
-
+							
 				elif splitData[0] == "total":
 					try:
 						count = 0
@@ -218,8 +218,6 @@ def commThread(prm):
 
 					except:
 						print "Error: Invalid indices, log has only {0} entries.".format(len(prm.log))
-				
-
 			elif data == "resume":
 				print "Resuming PRM"
 				prm.listening = True
