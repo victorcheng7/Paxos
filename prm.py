@@ -492,16 +492,16 @@ class Prm(object):
 			'''
 			self.checkingMajorityAccepts = False
 			self.acceptarray = []
-
+	
 	def sendUpdates(self, index):
 		print "Inside of sendUpdates"
 		while True:
-			time.sleep(0.02)
+			time.sleep(1)
 			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an update message
 				#print ("Sending Update Message to node ", dest_id)
 				msg = Message(self.id, self.ballot, None, None, index, None, self.log[index], Message.UPDATE)
 				sock.send(str(msg))	    	
-		
+	
 	def checkHeartBeat(self):
 		time.sleep(0.4)
 		counter = 0
@@ -516,7 +516,7 @@ class Prm(object):
 				sock.send(str(msg))	  
 
 
-	def addToLog(self, value, index): #only addToLog if there is an out of bounds error
+	def addToLog(self, value, index): #if get an update with higher index than your log, resize
 		try: 
 			if self.log[index] == None:
 				self.log[index] = value
