@@ -171,59 +171,44 @@ def commThread(prm):
 					for idx, val in enumerate(prm.log):
 						if val != None:
 							print "Index {0} : {1}".format(idx, val)
-
+							
 				elif splitData[0] == "total":
-					pos1 = int(splitData[1])
-					pos2 = int(splitData[2])
-					count = 0
 					try:
+						count = 0
+						for num in splitData[1:]:
+							pos = int(num)
+							file = open(prm.log[pos], "r")
+							for line in file:
+								count += int(line.strip('\n\r').split()[1])
+							file.close()
 
-						file1 = open(prm.log[pos1], "r")
-						file2 = open(prm.log[pos2], "r")
+						print "Total word count is {0}".format(count)
 
-
-						for line in file1:
-							count += int(line.strip('\n\r').split()[1])
-
-						for line2 in file2:
-							count += int(line2.strip('\n\r').split()[1])
-
-						print "Total word count at index {0}(\"".format(pos1) + prm.log[pos1] + "\") and index {0}(\"".format(pos2) + prm.log[pos2] + "\") is {0}".format(count)
-						file1.close()
-						file2.close()
 					except:
-						print "Error: Invalid index"
+						print "Error: Invalid indices, log has only {0} entries.".format(len(prm.log))
 
 				elif splitData[0] == "merge":
-					pos1 = int(splitData[1])
-					pos2 = int(splitData[2])
 					word_dict = {}
 
 					try:
-						file1 = open(prm.log[pos1], "r")
-						file2 = open(prm.log[pos2], "r")
+						word_dict = {}
+						for num in splitData[1:]:
+							pos = int(num)
+							file = open(prm.log[pos], "r")
 
-						for line in file1:
-							lineSplit = line.strip('\n\r').split()
+							for line in file:
+								lineSplit = line.strip('\n\r').split()
 
-							word = lineSplit[0]
-							count = int(lineSplit[1])
+								word = lineSplit[0]
+								count = int(lineSplit[1])
 
-							if word in word_dict:
-								word_dict[word] += count
-							else:
-								word_dict[word] = count
+								if word in word_dict:
+									word_dict[word] += count
+								else:
+									word_dict[word] = count
+							file.close()
 
-						for line2 in file2:
-							lineSplit2 = line2.strip('\n\r').split()
 
-							word2 = lineSplit2[0]
-							count2 = int(lineSplit2[1])
-
-							if word2 in word_dict:
-								word_dict[word2] += count2
-							else:
-								word_dict[word2] = count2
 
 						print "Word List"
 						print "---------------------"
@@ -231,11 +216,8 @@ def commThread(prm):
 						for key, val in word_dict.iteritems():
 							print "{0} {1}".format(key, val)
 
-						file1.close()
-						file2.close()
 					except:
-						print "Error: Invalid index"
-
+						print "Error: Invalid indices, log has only {0} entries.".format(len(prm.log))
 			elif data == "resume":
 				print "Resuming PRM"
 				prm.listening = True
