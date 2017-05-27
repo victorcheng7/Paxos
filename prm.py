@@ -52,6 +52,7 @@ def commThread(prm):
 					msg = Message.reconstructFromString(msg.strip())
 					if msg.msgType == Message.ISDECIDEDFALSE:
 						prm.isDecided = False 
+					
 				if prm.listening and not prm.isDecided:
 					#incoming messages from other PRMS
 					for msg in Message.split(data):
@@ -59,13 +60,16 @@ def commThread(prm):
 
 						if msg.msgType == Message.PREPARE:
 							print ("Received Prepare Message from ", msg.source_id, msg.ballot, msg.index, msg.originalPRM, msg.msgType)
+
+							heartBeatMsg = Message(prm.id, prm.ballot, None, None, prm.index, None, None, Message.HEARTBEAT)
+							prm.outgoing_channels[msg.source_id].send(str(heartBeatMsg))
 							
 							if msg.index < prm.index: 
 								print "The index you proposed has already been set in the log"
 							else:
 								msgBallotTuple = msg.ballot.split(",") # ex "1,0"
 								prmBallotTuple = prm.ballot.split(",") # ex. "1,0"
-								if ((msgBallotTuple[0] > prmBallotTuple[0]) or ((msgBallotTuple[0] == prmBallotTuple[0]) and (msgBallotTuple[1] > prmBallotTuple))): #is ballot > local ballot
+								if ((msgBallotTuple[0] > prmBallotTuple[0]) or ((msgBallotTuple[0] == prmBallotTuple[0]) and (msgBallotTuple[1] > prmBallotTuple[1]))): #is ballot > local ballot
 							   		prm.ballot = msg.ballot
 									ackMsg = Message(prm.id, prm.ballot, prm.acceptTuple, prm.acceptVal, msg.index, msg.originalPRM, None, Message.ACK)
 
@@ -75,7 +79,6 @@ def commThread(prm):
 
 						if msg.msgType == Message.ACK:
 							print ("Received ACK Message from ", msg.source_id, msg.ballot, prm.acceptTuple, prm.acceptVal, msg.index, msg.originalPRM, msg.log, msg.msgType)
-							prm.numAckMessages += 1
 							if not prm.checkingMajorityAcks: 
 								prm.checkingMajorityAcks = True
 								prm.ackarray.append(msg)
@@ -97,7 +100,7 @@ def commThread(prm):
 								prm.acceptarray.append(msg)
 							else: #you're not the original Proposer
 								if msg.index == prm.index: 
-									if (msg.ballot >= prm.ballot) and (msg.ballot not in prm.seenballotarray): #first time, relay message
+									if (msg.ballot >= prm.ballot) and (msg.ballot not in prm.seenballotarray) and (not prm.isDecided): #first time, relay message
 										prm.acceptTuple = msg.ballot 
 										prm.acceptVal = msg.acceptVal
 										prm.seenballotarray.append(msg.ballot)
@@ -109,7 +112,7 @@ def commThread(prm):
 									
 							
 						if msg.msgType == Message.DECIDE:
-							print "inside of Message.DECIDE receive"
+							print "INSIDE OF Message.DECIDE receive from ", msg.source_id
 							prm.isDecided = True
 							if msg.index > prm.index:
 								print "The index you proposed has already been set in the log"
@@ -126,6 +129,10 @@ def commThread(prm):
 							prm.addToLog(msg.log, msg.index)
 							#once you updated your log, send back the update source_id that you've completed and stop sending once everyone is updated, prm.updatedarray keep track of state on how many are updated
 						
+
+						if msg.msgType == Message.HEARTBEAT:
+							prm.heartBeat[msg.source_id-1] = True
+
 			except socket.error, e:
 				continue
 
@@ -149,9 +156,9 @@ def commThread(prm):
 						print ("Sent Prepare message to node ", dest_id)
 						msg = Message(prm.id, prm.ballot, None, prm.proposedFile, prm.index, prm.id, None, Message.PREPARE)
 						sock.send(str(msg)) 
-					checkNumAckMessages = threading.Thread(target = prm.checkNumAckMessages)
-					checkNumAckMessages.daemon = True
-					checkNumAckMessages.start()
+					checkHeartBeat = threading.Thread(target = prm.checkHeartBeat)
+					checkHeartBeat.daemon = True
+					checkHeartBeat.start()
 
 				elif data == "stop":
 					print "Stopping PRM"
@@ -279,6 +286,7 @@ class Message(object):
 	DECIDE = 3
 	UPDATE = 4
 	ISDECIDEDFALSE = 5
+	HEARTBEAT = 6
 	#NEEDUPDATE = 5
 	def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, msgType):
 		self.source_id = source_id
@@ -355,10 +363,11 @@ class Prm(object):
 		self.listening = True
 		self.done_processes = set()
 
-		self.numAckMessages = 0
 		self.isDecided = False
 		self.proposedFile = None
 		self.num_nodes = 0
+		self.heartBeat = [False]*15
+		self.heartBeat[self.id-1] = True
 		self.ballot = "0," + str(site_id) 
 		self.acceptTuple =  "0,0" #Default acceptTuple if None
 		self.acceptVal = "-1" #Default acceptVal if None
@@ -381,7 +390,9 @@ class Prm(object):
 		self.seenballotarray = [] #have you seen this ballot in an accept message before?
 		self.checkingMajorityAcks = False
 		self.checkingMajorityAccepts = False
-		self.numAckMessages = 0
+		self.heartBeat = [False]*15
+		self.heartBeat[self.id-1] = True
+
 
 	def stop():
 		self.listening = False
@@ -405,7 +416,7 @@ class Prm(object):
 
 				for msg in self.ackarray: #set highestAcceptNum = highest AcceptNum out of all the messages
 					tempAcceptNum = msg.acceptTuple.split(",")
-					if ((tempAcceptNum[0] > checkAcceptNum[0]) or ((tempAcceptNum[0] == checkAcceptNum[0]) and (tempAcceptNum[1] > checkAcceptNum))) and (msg.originalPRM == self.id):
+					if ((tempAcceptNum[0] > checkAcceptNum[0]) or ((tempAcceptNum[0] == checkAcceptNum[0]) and (tempAcceptNum[1] > checkAcceptNum[1]))) and (msg.originalPRM == self.id):
 						highestAcceptNum = msg.acceptTuple
 						highestAcceptVal = msg.acceptVal
 
@@ -416,6 +427,7 @@ class Prm(object):
 					else: 
 						self.acceptTuple = highestAcceptNum
 						self.acceptVal = highestAcceptVal
+					print "Setting acceptNum to ", self.acceptTuple, self.acceptVal
 					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an accept message
 							print ("Sent Accept message to node ", dest_id)
 							msg = Message(self.id, self.ballot, None, self.acceptVal, self.index, self.id, None, Message.ACCEPT) #MAY CAUSE ERROR CAUSE SELF.INDEX IS NOT ACCURATE
@@ -451,7 +463,7 @@ class Prm(object):
 						#self.proposedFile is None because it got reset already
 						msg = Message(self.id, self.ballot, None, None, self.index, self.id, self.proposedFile, Message.DECIDE)
 						sock.send(str(msg))	
-					print "adding to log", self.proposedFile, self.index
+					print "ADDING TO LOG", self.proposedFile, self.index
 					self.addToLog(self.proposedFile, self.index)
 					#periodically send updates to all other nodes
 					sendUpdatesThread = threading.Thread(target = self.sendUpdates, args=(self.index-1,))
@@ -490,12 +502,16 @@ class Prm(object):
 				msg = Message(self.id, self.ballot, None, None, index, None, self.log[index], Message.UPDATE)
 				sock.send(str(msg))	    	
 		
-	def checkNumAckMessages(self):
-		print "Trying to repropose"
+	def checkHeartBeat(self):
 		time.sleep(0.4)
-		while (self.numAckMessages + 1) < 0.5*(self.num_nodes+1):
+		counter = 0
+		while (counter) < 0.5*(self.num_nodes+1):
+			counter = 0
+			for alive in self.heartBeat:
+				if alive:
+					counter += 1
 			time.sleep(0.1)
-			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an prepare message
+			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
 				msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
 				sock.send(str(msg))	  
 
