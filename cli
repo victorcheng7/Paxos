@@ -5,6 +5,7 @@ import time
 import threading
 import sys
 import re
+import subprocess
 
 
 cli = None
@@ -210,7 +211,8 @@ def checkIsReducedFile(filename):
 	return True
 
 def setup(cli, setup_file):
-	#Read setup file. ex - setup.txt     
+	#Read setup file. ex - setup.txt  
+	subprocess.call(["python", "getmid.py", "mapperText.txt"])   
 	with open(setup_file, 'r') as f:
 		N = int(f.readline().strip())
 		cli.num_proc = N

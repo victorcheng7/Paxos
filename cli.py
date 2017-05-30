@@ -1,16 +1,13 @@
 #!/usr/bin/env python
-from termios import tcflush, TCIFLUSH
+# from termios import tcflush, TCIFLUSH
 import socket
 import time
 import threading
 import sys
 import re
-
-
-cli = None
+import subprocess
 
 def main():
-	global cli
 	if(len(sys.argv) != 3):
 		print("USAGE: python [cli_id] [setup_file]")
 		exit(1)
@@ -19,12 +16,12 @@ def main():
 	setup_file = sys.argv[2]
 	setup(cli, setup_file)
 
-	cThread = threading.Thread(target = commThread)
+	cThread = threading.Thread(target = commThread, args=(cli,))
 	cThread.daemon = True
 	cThread.start()
 
 	# make prm connect to all other prms to confirm initialization
-	cli.outgoingSocket.send("confirmInit")
+	cli.prm[1].send("confirmInit")
 
 	print "I am CLI {0}".format(cli_id)
 	time.sleep(1.5)
@@ -37,7 +34,7 @@ def main():
 				sys.stdout.flush()
 				time.sleep(1)
 				
-			tcflush(sys.stdin, TCIFLUSH)
+			# tcflush(sys.stdin, TCIFLUSH)
 		
 		command = None
 		# make sure command not empty
@@ -48,15 +45,20 @@ def main():
 		if splitCommand[0] == "map" and len(splitCommand) == 2:
 			try:
 				validFile(splitCommand[1])
+				print "sending map stuff"
+				cli.mapper1[1].send("mapper1 mapping")
+				cli.mapper2[1].send("mapper2 mapping")
 			except:
 				print "USAGE: map [filename]. File must exist in folder"
 				continue
-			print "map"
+			
 
 		elif splitCommand[0] == "reduce" and len(splitCommand) == 3:
 			try:
 				validFile(splitCommand[1])
 				validFile(splitCommand[2])
+
+				cli.reducer[1].send("reducer reducing")
 			except:
 				print "USAGE: reduce [filename1] [filename2]. Files must exist in folder"
 				continue
@@ -68,7 +70,7 @@ def main():
 				validContents = checkIsReducedFile(command.split()[1])
 				if not validContents:
 					continue
-				cli.outgoingSocket.send("replicate " + command.split()[1]) 
+				cli.prm[1].send("replicate " + command.split()[1]) 
 				cli.prmReplicating = True
 				cli.toReplicate = command.split()[1]
 			except:
@@ -76,19 +78,19 @@ def main():
 				continue
 
 		elif splitCommand[0] == "stop" and len(splitCommand) == 1:
-			cli.outgoingSocket.send("stop")
+			cli.prm[1].send("stop")
 
 		elif splitCommand[0] == "resume" and len(splitCommand) == 1:
-			cli.outgoingSocket.send("resume")	
+			cli.prm[1].send("resume")	
 
 		elif splitCommand[0] == "print" and len(splitCommand) == 1:
-			cli.outgoingSocket.send("print")
+			cli.prm[1].send("print")
 
 		elif splitCommand[0] == "merge" and len(splitCommand) == 3:
 			try:
 				pos1 = abs(int(splitCommand[1]))
 				pos2 = abs(int(splitCommand[2]))
-				cli.outgoingSocket.send("{0} {1} {2}".format(splitCommand[0], pos1, pos2))
+				cli.prm[1].send("{0} {1} {2}".format(splitCommand[0], pos1, pos2))
 			
 			except:
 				print "Error: arguments must be valid integers"
@@ -102,7 +104,7 @@ def main():
 					pos = abs(int(num))
 					message += " {0}".format(pos)
 
-				cli.outgoingSocket.send(message)
+				cli.prm[1].send(message)
 
 			except:
 				print "Error: arguments must be valid integers"
@@ -122,11 +124,12 @@ def main():
 			print "merge [pos1] [pos2]"
 			print "--------------------------------"
 			print ""
-def commThread():
+
+def commThread(cli):
 
 	while True:
 		try:
-			data = cli.incomingStream.recv(1024)
+			data = cli.prm[0].recv(1024)
 			splitData = data.split(" ")
 
 			#print data
@@ -203,51 +206,80 @@ def checkIsReducedFile(filename):
 	return True
 
 def setup(cli, setup_file):
-	#Read setup file. ex - setup.txt     
+	
+	# start mappers and reducer
+	subprocess.Popen(["python", "mapper.py", "0", str(cli.id), "setup2.txt"])
+	subprocess.Popen(["python", "mapper.py", "1", str(cli.id), "setup2.txt"])
+	subprocess.Popen(["python", "reducer.py", str(cli.id), "setup2.txt"])
+	print "finished subcall"
+
+	#Read setup file. ex - setup.txt
 	with open(setup_file, 'r') as f:
 		N = int(f.readline().strip())
-		cli.num_proc = N
 		process_id = 0
 		for line in f.readlines():
 			process_id += 1
 			if process_id == cli.id :
-				IP1, port1, IP2, port2 = line.strip().split()
+				IP1, port1, IP2, port2, map1IP, map1Port, map2IP, map2Port, reducerIP, reducerPort = line.strip().split()
 				port1 = int(port1)
 				port2 = int(port2)
+				map1Port = int(map1Port)
+				map2Port = int(map2Port)
+				reducerPort = int(reducerPort)
 
 				cli.openListeningSocket(IP1, port1)
+				print "openedListeningSocket"
+				cli.prm = cli.establishConnection((IP2, port2))
+				print "established prm"
+				cli.mapper1 = cli.establishConnection((map1IP, map1Port))
 
-				# connect to prm
-				while True:
-					try: 
-						sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-						sock.connect((IP2, port2))
-						cli.outgoingSocket = sock
-						break
-					except Exception:
-						continue
-
-				# accept incoming prm connection
-				while True:
-					try:
-						con, _ = cli.listeningSocket.accept()
-						con.setblocking(0)
-						cli.incomingStream = con
-						break
-					except socket.error:
-						continue
-
+				print "established mapper1"
+				cli.mapper2 = cli.establishConnection((map2IP, map2Port))
+				print "established mapper2"
+				cli.reducer = cli.establishConnection((reducerIP, reducerPort))
+				print "established reducer"
+				
 class Cli(object):
 	def __init__(self, cli_id):
 		self.id = cli_id
-		self.num_proc = 0
-
-		self.outgoingSocket = None
-		self.incomingStream = None
 		self.listeningSocket = None
+
+		self.prm = [None]*2 #format: [incoming,outgoing]
+		self.mapper1 = [None]*2 
+		self.mapper2 = [None]*2 
+		self.reducer = [None]*2
 
 		self.prmReplicating = False
 		self.toReplicate = ""
+
+
+	def establishConnection(self, addr):
+		# establish incoming and outgoing connection
+
+		outgoingSocket = None
+		incomingStream = None
+
+		# outgoing
+		while True:
+			try: 
+				sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+				sock.connect(addr)
+				outgoingSocket = sock
+				break
+			except Exception:
+				continue
+
+		# incoming
+		while True:
+			try:
+				con, addr = self.listeningSocket.accept()
+				con.setblocking(0)
+				incomingStream = con
+				break
+			except socket.error:
+				continue
+
+		return [incomingStream, outgoingSocket]
 
 	def openListeningSocket(self, IP, port):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -255,7 +287,6 @@ class Cli(object):
 		self.listeningSocket.bind( (IP, port) )
 		self.listeningSocket.setblocking(0) 
 		self.listeningSocket.listen(10)
-
 
 main()
 
