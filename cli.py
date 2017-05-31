@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from termios import tcflush, TCIFLUSH
-from miscFuncs import getSplit, getFileLen, validFile, checkIsReducedFile
+from miscFuncs import getSplit, getFileLen, validFile, checkIsReducedFile, printDot
 import socket
 import time
 import threading
@@ -31,10 +31,7 @@ def main():
 		if cli.prmReplicating:
 			sys.stdout.write("PRM in the middle of replicating")
 			while cli.prmReplicating:
-				sys.stdout.write(".")
-				sys.stdout.flush()
-				time.sleep(1)
-				
+				printDot()
 			tcflush(sys.stdin, TCIFLUSH)
 		
 		command = None
@@ -59,16 +56,18 @@ def main():
 				continue
 			
 		# reduce
-		elif splitCommand[0] == "reduce" and len(splitCommand) == 3:
+		elif splitCommand[0] == "reduce" and len(splitCommand) > 2:
 			try:
-				validFile(splitCommand[1])
-				validFile(splitCommand[2])
+				message = "reduce"
+				for file in splitCommand[1:]:
+					validFile(file)
+					message += " " + file
 
-				cli.reducer[1].send("reducer reducing")
+				cli.reducer[1].send(message)
+
 			except:
-				print "USAGE: reduce [filename1] [filename2]. Files must exist in folder"
+				print "USAGE: reduce [filename1] [filename2]... Files must exist in folder"
 				continue
-			print "reduce"
 
 		# replicate
 		elif splitCommand[0] == "replicate" and len(splitCommand) == 2:
@@ -139,7 +138,6 @@ def commThread(cli):
 			data = cli.prm[0].recv(1024)
 			splitData = data.split(" ")
 
-			#print data
 			if data == "stopped":
 				cli.prmReplicating = False
 				time.sleep(1.5)
@@ -161,7 +159,24 @@ def commThread(cli):
 				cli.toReplicate = ""
 
 		except socket.error, e:
-			continue
+			pass
+
+
+		# read from all other incoming connections
+		for con in cli.connections[1:]:
+
+			try:
+				data = con[0].recv(1024)
+				
+				splitData = data.split(" ")
+
+				if splitData[0] == "taskFinished":
+					time.sleep(1)
+					print ""
+					print data[len("taskFinished"):]
+			
+			except socket.error, e:
+				continue
 
 
 
@@ -171,7 +186,6 @@ def setup(cli, setup_file):
 	subprocess.Popen(["python", "mapper.py", "0", str(cli.id), "setup2.txt"])
 	subprocess.Popen(["python", "mapper.py", "1", str(cli.id), "setup2.txt"])
 	subprocess.Popen(["python", "reducer.py", str(cli.id), "setup2.txt"])
-	print "finished subcall"
 
 	#Read setup file. ex - setup.txt
 	with open(setup_file, 'r') as f:
@@ -188,16 +202,12 @@ def setup(cli, setup_file):
 				reducerPort = int(reducerPort)
 
 				cli.openListeningSocket(IP1, port1)
-				print "openedListeningSocket"
 				cli.prm = cli.establishConnection((IP2, port2))
-				print "established prm"
 				cli.mapper1 = cli.establishConnection((map1IP, map1Port))
-
-				print "established mapper1"
 				cli.mapper2 = cli.establishConnection((map2IP, map2Port))
-				print "established mapper2"
 				cli.reducer = cli.establishConnection((reducerIP, reducerPort))
-				print "established reducer"
+
+				cli.connections = [cli.prm, cli.mapper1, cli.mapper2, cli.reducer]
 				
 class Cli(object):
 	def __init__(self, cli_id):
@@ -208,6 +218,8 @@ class Cli(object):
 		self.mapper1 = [None]*2 
 		self.mapper2 = [None]*2 
 		self.reducer = [None]*2
+
+		self.connections = []
 
 		self.prmReplicating = False
 		self.toReplicate = ""

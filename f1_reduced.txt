@@ -3,10 +3,3 @@ trumpet 4
 painting 2
 flower 2
 car 6
-
-
-
-
-
-
-

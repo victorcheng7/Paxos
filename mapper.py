@@ -16,8 +16,6 @@ def main():
 	setup_file = sys.argv[3]
 	setup(mapper, setup_file)
 
-	print "map is sending"
-	mapper.outgoingSocket.send("I am mapper")
 	cThread = threading.Thread(target = commThread, args=(mapper,))
 	cThread.start()
 
@@ -29,13 +27,12 @@ def commThread(mapper):
 			data = mapper.incomingStream.recv(1024)
 			splitData = data.split()
 
-			print "Mapper {0} received {1}".format(mapper.mapper_id, data)
-
 			if splitData[0] == "map":
 				filename = splitData[1]
 				offset = splitData[2]
 				size = splitData[3]
 				mapper.mapFile(filename, int(offset), int(size))
+				mapper.outgoingSocket.send("taskFinished Finished. Mapped file is {0}_I_{1}".format(filename, mapper.mapper_id))
 
 		except socket.error, e:
 			continue
@@ -120,7 +117,6 @@ class Mapper(object):
 
 		i_file.close()
 		orig_file.close()
-		print "finished mapping"
 
 
 

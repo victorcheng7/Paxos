@@ -1,4 +1,12 @@
 #!/usr/bin/env python
+import sys
+import re
+import time
+
+def printDot():
+	sys.stdout.write(".")
+	sys.stdout.flush()
+	time.sleep(1)
 
 def getSplit(filename):
 	fileLen = getFileLen(filename)
@@ -13,6 +21,8 @@ def getSplit(filename):
 		split += 1
 
 	return split
+
+	file.close()
 
 def getFileLen(filename):
 	file = open(filename, "r")
@@ -63,8 +73,10 @@ def checkIsReducedFile(filename):
 
 		# error if this is reached
 		print "Error: invalid line \"{0}\"".format(entry)
+		reduce_obj.close()
 		return False
 
+	reduce_obj.close()
 	if len(word_list) != len(set(word_list)):
 		print "Error: duplicate words found in file"
 		return False

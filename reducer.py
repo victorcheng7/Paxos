@@ -25,8 +25,16 @@ def commThread(reducer):
 			data = reducer.incomingStream.recv(1024)
 			splitData = data.split(" ")
 
-			#print data
-			print "Reducer received " + data
+			
+			if splitData[0] == "reduce":
+				orig_file = splitData[1][:splitData[1].find("_I_")]
+				word_dict = {}
+				for file in splitData[1:]:
+					reducer.addWords(file, word_dict)
+
+				reducer.writetoFile(orig_file + "_reduced", word_dict)
+				reducer.outgoingSocket.send("taskFinished Finished. Reduced file is " + orig_file + "_reduced")
+
 		except socket.error, e:
 			continue
 
@@ -77,6 +85,37 @@ class Reducer(object):
 		self.listeningSocket.bind( addr )
 		self.listeningSocket.setblocking(0) 
 		self.listeningSocket.listen(10)
+
+	def addWords(self, filename, word_dict):
+		file = open(filename, "r")
+
+		for line in file:
+			lineSplit = line.strip('\n\r').split()
+
+			word = lineSplit[0]
+			count = int(lineSplit[1])
+
+			if word in word_dict:
+				word_dict[word] += count
+			elif word != "":
+				word_dict[word] = count
+		
+		file.close()
+
+	def writetoFile(self, filename, word_dict):
+		file = open(filename, "w+")
+		for word, count in word_dict.iteritems():
+			file.write(word + " {0}\n".format(count))
+
+		# delete whitespace at end
+		file.seek(-1,2)
+		while file.read(1).isspace():
+			file.truncate(file.tell()-1)
+			file.seek(-1,2)
+
+		file.close()
+
+
 
 main()
 
