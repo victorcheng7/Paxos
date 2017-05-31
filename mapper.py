@@ -27,11 +27,16 @@ def commThread(mapper):
 
 		try:
 			data = mapper.incomingStream.recv(1024)
-			print "I received"
-			splitData = data.split(" ")
+			splitData = data.split()
 
-			#print data
 			print "Mapper {0} received {1}".format(mapper.mapper_id, data)
+
+			if splitData[0] == "map":
+				filename = splitData[1]
+				offset = splitData[2]
+				size = splitData[3]
+				mapper.mapFile(filename, int(offset), int(size))
+
 		except socket.error, e:
 			continue
 
@@ -85,6 +90,39 @@ class Mapper(object):
 		self.listeningSocket.bind( addr )
 		self.listeningSocket.setblocking(0) 
 		self.listeningSocket.listen(10)
+
+	def mapFile(self, filename, offset, size):
+		i_file = open("{0}_I_{1}".format(filename, self.mapper_id), "w+")
+		orig_file = open(filename, "r")
+
+		orig_file.seek(offset)
+		curOffset = orig_file.tell() - offset
+
+		words = []
+
+		while curOffset < size:
+			line = orig_file.readline()
+
+			lineSplit = line.split()
+			if curOffset + len(line) > size:
+				lineSplit = line[:size-curOffset].split()
+
+
+			for word in lineSplit:
+				words.append(word)
+
+			curOffset = orig_file.tell() - offset
+
+		for word in words[:-1]:
+			i_file.write(word + " 1\n")
+
+		i_file.write(words[-1] + " 1")
+
+		i_file.close()
+		orig_file.close()
+		print "finished mapping"
+
+
 
 main()
 

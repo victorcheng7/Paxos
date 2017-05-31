@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-# from termios import tcflush, TCIFLUSH
+from termios import tcflush, TCIFLUSH
+from miscFuncs import getSplit, getFileLen, validFile, checkIsReducedFile
 import socket
 import time
 import threading
@@ -34,7 +35,7 @@ def main():
 				sys.stdout.flush()
 				time.sleep(1)
 				
-			# tcflush(sys.stdin, TCIFLUSH)
+			tcflush(sys.stdin, TCIFLUSH)
 		
 		command = None
 		# make sure command not empty
@@ -42,17 +43,22 @@ def main():
 			command = raw_input("[CLI]$ ")
 			splitCommand = command.split()
 
+
+		# map
 		if splitCommand[0] == "map" and len(splitCommand) == 2:
 			try:
-				validFile(splitCommand[1])
-				print "sending map stuff"
-				cli.mapper1[1].send("mapper1 mapping")
-				cli.mapper2[1].send("mapper2 mapping")
+				filename = splitCommand[1]
+				validFile(filename)
+				offset = getSplit(filename)
+				size = getFileLen(filename)
+
+				cli.mapper1[1].send("map {0} {1} {2}".format(filename, 0, offset - 1))
+				cli.mapper2[1].send("map {0} {1} {2}".format(filename, offset, size - offset))
 			except:
 				print "USAGE: map [filename]. File must exist in folder"
 				continue
 			
-
+		# reduce
 		elif splitCommand[0] == "reduce" and len(splitCommand) == 3:
 			try:
 				validFile(splitCommand[1])
@@ -64,6 +70,7 @@ def main():
 				continue
 			print "reduce"
 
+		# replicate
 		elif splitCommand[0] == "replicate" and len(splitCommand) == 2:
 			try:
 				validFile(splitCommand[1])
@@ -156,54 +163,7 @@ def commThread(cli):
 		except socket.error, e:
 			continue
 
-def validFile(filename):
-	file = open(filename, "r")
-	#TODO check to see if file is reduced file
-	file.close()
 
-def checkIsReducedFile(filename):
-
-	entry_list = []
-	word_list = []
-	reduce_obj = open(filename, "r")
-
-	for line in reduce_obj:
-	    entry_list.append(line.strip('\n\r'))
-
-	if len(entry_list) == 0:
-		print "Error: Empty file"
-		return False
-
-	matcher = re.compile(r'[a-zA-z][a-z]*')
-	#check if all lines valid
-	for entry in entry_list:
-		
-		#check only two words in line
-		if len(entry.split()) == 2:
-			
-			# check 1st is valid word 
-			x = matcher.findall(entry.split()[0])
-			if len(x) == 1 :
-				if len(x[0]) == len(entry.split()[0]):
-					
-					# check 2nd is valid number
-					try:
-						num = int(entry.split()[1])
-						if num > 0:
-							word_list.append(entry.split()[0])
-							continue
-					except:
-						pass
-
-		# error if this is reached
-		print "Error: invalid line \"{0}\"".format(entry)
-		return False
-
-	if len(word_list) != len(set(word_list)):
-		print "Error: duplicate words found in file"
-		return False
-
-	return True
 
 def setup(cli, setup_file):
 	
