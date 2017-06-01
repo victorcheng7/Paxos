@@ -32,7 +32,7 @@ def commThread(mapper):
 				offset = splitData[2]
 				size = splitData[3]
 				mapper.mapFile(filename, int(offset), int(size))
-				mapper.outgoingSocket.send("taskFinished Finished. Mapped file is {0}_I_{1}".format(filename, mapper.mapper_id))
+				mapper.outgoingSocket.send("Finished. Mapped file is {0}_I_{1}".format(filename, mapper.mapper_id))
 
 		except socket.error, e:
 			continue

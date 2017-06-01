@@ -33,7 +33,7 @@ def commThread(reducer):
 					reducer.addWords(file, word_dict)
 
 				reducer.writetoFile(orig_file + "_reduced", word_dict)
-				reducer.outgoingSocket.send("taskFinished Finished. Reduced file is " + orig_file + "_reduced")
+				reducer.outgoingSocket.send("Finished. Reduced file is " + orig_file + "_reduced")
 
 		except socket.error, e:
 			continue

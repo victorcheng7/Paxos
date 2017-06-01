@@ -167,13 +167,15 @@ def commThread(cli):
 
 			try:
 				data = con[0].recv(1024)
-				
-				splitData = data.split(" ")
+				print data
+				print "[CLI]$",
+				sys.stdout.flush()
 
-				if splitData[0] == "taskFinished":
-					time.sleep(1)
-					print ""
-					print data[len("taskFinished"):]
+
+				# if splitData[0] == "taskFinished":
+				# 	time.sleep(1)
+				# 	print ""
+				# 	print data[len("taskFinished"):]
 			
 			except socket.error, e:
 				continue
@@ -182,10 +184,7 @@ def commThread(cli):
 
 def setup(cli, setup_file):
 	
-	# start mappers and reducer
-	subprocess.Popen(["python", "mapper.py", "0", str(cli.id), "setup2.txt"])
-	subprocess.Popen(["python", "mapper.py", "1", str(cli.id), "setup2.txt"])
-	subprocess.Popen(["python", "reducer.py", str(cli.id), "setup2.txt"])
+	
 
 	#Read setup file. ex - setup.txt
 	with open(setup_file, 'r') as f:
@@ -202,11 +201,20 @@ def setup(cli, setup_file):
 				reducerPort = int(reducerPort)
 
 				cli.openListeningSocket(IP1, port1)
+
 				cli.prm = cli.establishConnection((IP2, port2))
+
+				# start mappers and reducer
+				subprocess.Popen(["python", "mapper.py", "0", str(cli.id), "setup2.txt"])
 				cli.mapper1 = cli.establishConnection((map1IP, map1Port))
-				cli.mapper2 = cli.establishConnection((map2IP, map2Port))
+
+				subprocess.Popen(["python", "mapper.py", "1", str(cli.id), "setup2.txt"])
+				cli.mapper2 = cli.establishConnection((map2IP, map2Port))	
+
+				subprocess.Popen(["python", "reducer.py", str(cli.id), "setup2.txt"])
 				cli.reducer = cli.establishConnection((reducerIP, reducerPort))
 
+				
 				cli.connections = [cli.prm, cli.mapper1, cli.mapper2, cli.reducer]
 				
 class Cli(object):
