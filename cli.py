@@ -27,7 +27,7 @@ def main():
 	cli.outgoingSocket.send("confirmInit")
 
 	print "I am CLI {0}".format(cli_id)
-	time.sleep(1.5)
+	time.sleep(2.5)
 	while True:
 
 		if cli.prmReplicating:
@@ -146,9 +146,16 @@ def commThread():
 						print "Unsucessful replication.",
 					else:
 						print "Sucessful replication.",
-				cli.prmReplicating = False
+				
 				print "The file \"{0}\" was decided for index {1}".format(splitData[2], splitData[1])
+				
+				if not cli.prmReplicating:
+					print "[CLI]$ ",
+					sys.stdout.flush()
+
 				cli.toReplicate = ""
+				cli.prmReplicating = False
+
 
 		except socket.error, e:
 			continue
