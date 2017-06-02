@@ -414,7 +414,7 @@ class Prm(object):
 							print ("Sent Accept message to node ", dest_id)
 							msg = Message(self.id, self.ballot, None, self.acceptVal, self.index, self.id, None, Message.ACCEPT) #MAY CAUSE ERROR CAUSE SELF.INDEX IS NOT ACCURATE
 							sock.send(str(msg))	
-			'''
+			
 			else: 
 				time.sleep(randint(10,30)/10.0)
 				self.incrementBallot()
@@ -423,7 +423,7 @@ class Prm(object):
 						print ("Sending Repropose to node ", dest_id)
 						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
 						sock.send(str(msg))		
-			'''	
+			
 			self.checkingMajorityAcks = False
 			self.ackarray = []
 
@@ -461,7 +461,7 @@ class Prm(object):
 				self.cli[1].send("finishReplicating " + str(self.index-1) + " " + self.log[self.index-1])
 				time.sleep(0.5)
 				self.newRoundCleanUp()
-			'''
+			
 			else: 
 				time.sleep(randint(10,30)/10.0)
 				self.incrementBallot()
@@ -471,7 +471,7 @@ class Prm(object):
 						print ("Sending Prepare to node ", dest_id)
 						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
 						sock.send(str(msg))	
-			'''
+			
 			self.checkingMajorityAccepts = False
 			self.acceptarray = []
 	
@@ -489,11 +489,12 @@ class Prm(object):
 		counter = 0
 		if not self.isDecided:
 			while (counter) < 0.5*(self.num_nodes+1):
+				self.heartBeat = [False]*15
 				counter = 0
 				for alive in self.heartBeat:
 					if alive:
 						counter += 1
-				time.sleep(0.1)
+				time.sleep(0.2)
 				if not self.isDecided:
 					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
 						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)

@@ -239,7 +239,7 @@ def setup(prm, setup_file):
 	  for line in f.readlines():
 		  process_id += 1
 		  if process_id <= N:
-			  IP1, port1, IP2, port2 = line.strip().split()
+			  IP1, port1, IP2, port2, _, _, _, _, _, _ = line.strip().split()
 			  port1 = int(port1)
 			  port2 = int(port2)
 
@@ -253,7 +253,6 @@ def setup(prm, setup_file):
 			  prm.addOutgoingChannel(process_id)
 
 	prm.openOutgoingChannels()
-	print "finished outgoing channels"
 	# start commThread
 	cThread = threading.Thread(target = commThread, args=(prm,))
 	cThread.daemon = True
