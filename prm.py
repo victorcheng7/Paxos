@@ -50,9 +50,12 @@ def commThread(prm):
 			try:
 				data = con.recv(1024)
 				for msg in Message.split(data):
-					msg = Message.reconstructFromString(msg.strip())
-					if msg.msgType == Message.ISDECIDEDFALSE:
-						prm.isDecided = False 
+					try:
+						msg = Message.reconstructFromString(msg.strip())
+						if msg.msgType == Message.ISDECIDEDFALSE:
+							prm.isDecided = False 
+					except Exception:
+						continue
 					
 				if prm.listening and not prm.isDecided:
 					#incoming messages from other PRMS
@@ -281,15 +284,15 @@ class Message(object):
 		self.msgType = msgType
 
 	def __str__(self):
-		res = str(self.source_id) + " " + str(self.ballot) + " " + str(self.index) + " " + str(self.msgType) 
+		res = str(self.source_id) + "&" + str(self.ballot) + "&" + str(self.index) + "&" + str(self.msgType) 
 		if self.acceptTuple != None:
-			res += " " + str(self.acceptTuple)
+			res += "&" + str(self.acceptTuple)
 		if self.acceptVal != None: 
-			res += " " + str(self.acceptVal)
+			res += "&" + str(self.acceptVal)
 		if self.originalPRM != None:
-			res += " " + str(self.originalPRM)
+			res += "&" + str(self.originalPRM)
 		if self.log != None:
-			res += " " + str(self.log)
+			res += "&" + str(self.log)
 		res += "||"
 		return res
 
@@ -299,7 +302,7 @@ class Message(object):
 
 	@staticmethod
 	def reconstructFromString(str):
-		keyWords = str.strip().split()
+		keyWords = str.strip().split("&")
 		source_id = int(keyWords[0])
 		ballot = keyWords[1]
 		index = int(keyWords[2])
