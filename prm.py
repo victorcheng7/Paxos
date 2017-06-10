@@ -49,13 +49,13 @@ def commThread(prm):
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
 				data = con.recv(1024)
-				for msg in Message.split(data):
-					try:
+				try:
+					for msg in Message.split(data):
 						msg = Message.reconstructFromString(msg.strip())
 						if msg.msgType == Message.ISDECIDEDFALSE:
 							prm.isDecided = False 
-					except Exception:
-						continue
+				except Exception:
+					continue
 					
 				if prm.listening and not prm.isDecided:
 					#incoming messages from other PRMS
@@ -155,6 +155,22 @@ def commThread(prm):
 						msg = Message(prm.id, prm.ballot, None, None, prm.index, None, None, Message.ISDECIDEDFALSE)
 						sock.send(str(msg))
 					prm.proposedFile = splitData[1]
+
+					try:
+						print prm.proposedFile
+						file = open(prm.proposedFile, "r")
+						for line in file:
+							print "hello"
+							keyWord = line.split(" ")
+							prm.proposedDictionary[keyWord[0]] = keyWord[1]
+							print keyWord[0] keyWord[1]
+						file.close()
+					except:
+						print "Error: Invalid indices, log has only {0} entries.".format(len(prm.log))
+					
+					for word, count in prm.proposedDictionary.iteritems():
+						print word, count
+
 					prm.incrementBallot()
 					for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
 						print ("Sent Prepare message to node ", dest_id)
@@ -273,7 +289,7 @@ class Message(object):
 	ISDECIDEDFALSE = 5
 	HEARTBEAT = 6
 	#NEEDUPDATE = 5
-	def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, msgType):
+	def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, logDictionary, msgType):
 		self.source_id = source_id
 		self.ballot = ballot
 		self.acceptTuple = acceptTuple
@@ -282,6 +298,7 @@ class Message(object):
 		self.originalPRM = originalPRM
 		self.log = log
 		self.msgType = msgType
+		self.logDictionary = logDictionary
 
 	def __str__(self):
 		res = str(self.source_id) + "&" + str(self.ballot) + "&" + str(self.index) + "&" + str(self.msgType) 
@@ -293,6 +310,8 @@ class Message(object):
 			res += "&" + str(self.originalPRM)
 		if self.log != None:
 			res += "&" + str(self.log)
+		if self.logDictionary != None:
+			res += "&" + str(self.logDictionary)
 		res += "||"
 		return res
 
@@ -324,9 +343,11 @@ class Message(object):
 		if msgType == Message.DECIDE:
 			originalPRM = int(keyWords[4])
 			log = keyWords[5]
+			logDictionary = keyWords[6]
 		if msgType == Message.UPDATE:
 			log = keyWords[4]		
-		return Message(source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, msgType)
+			logDictionary = keyWords[5]
+		return Message(source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, msgType, logDictionary)
 
 	@staticmethod
 	def split(str):
@@ -350,6 +371,7 @@ class Prm(object):
 
 		self.isDecided = False
 		self.proposedFile = None
+		self.proposedDictionary = None
 		self.num_nodes = 0
 		self.heartBeat = [False]*15
 		self.heartBeat[self.id-1] = True
@@ -363,6 +385,7 @@ class Prm(object):
 		self.checkingMajorityAcks = False
 		self.checkingMajorityAccepts = False
 		self.log = []
+		self.logDictionary = [] #array of dictionaries
 
 	def newRoundCleanUp(self):
 		self.proposedFile = None
@@ -438,6 +461,7 @@ class Prm(object):
 				if msg.originalPRM == self.id:
 					counter += 1
 			print "Checking to see if I have Majority Accepts..."
+
 			if (counter + 1) >= 0.5*(self.num_nodes+1):
 				print "I have majority Accepts!"
 				#self.log.append(self.proposedFile)
