@@ -487,6 +487,8 @@ class Prm(object):
 						print ("Sent Decide message to node ", dest_id)
 						#self.proposedFile is None because it got reset already
 						msg = Message(self.id, self.ballot, None, None, self.index, self.id, self.proposedFile, Message.DECIDE, self.proposedDictionary)
+						sock.sendall(len(str(msg.encode('utf-8')))
+						print "OWEJFOWIEJFOI", len(str(msg.encode('utf-8'))
 						sock.sendall(str(msg))	
 					print "ADDING TO LOG", self.proposedFile, self.index
 					self.addToLog(self.proposedFile, self.proposedDictionary, self.index)
@@ -586,7 +588,8 @@ class Prm(object):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.listeningSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.listeningSocket.bind( (IP, port) )
-		self.listeningSocket.setblocking(0) 
+		self.listeningSocket.settimeout(0.2)
+		#self.listeningSocket.setblocking(0) 
 		self.listeningSocket.listen(1)
 		self.listening = True
 
