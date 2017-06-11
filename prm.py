@@ -332,9 +332,14 @@ class Message(object):
 			originalPRM = int(keyWords[4])
 			log = keyWords[5]
 			logDictionary = json.loads(keyWords[6])
+			#for word, count in logDictionary.iteritems():
+			#	print word, count
 		if msgType == Message.UPDATE:
 			log = keyWords[4]		
 			logDictionary = json.loads(keyWords[5])
+			#print keyWords[5].trumpet
+			#for word, count in logDictionary.iteritems():
+			#	print word, count
 		return Message(source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, msgType, logDictionary)
 
 	@staticmethod
@@ -416,18 +421,18 @@ class Prm(object):
 						highestAcceptNum = msg.acceptTuple
 						highestAcceptVal = msg.acceptVal
 
-				if not self.isDecided:
-					if highestAcceptNum == "0,0": #None of the msgs have acceptNum set already
-						self.acceptTuple = self.ackarray[0].ballot
-						self.acceptVal = self.ackarray[0].acceptVal
-					else: 
-						self.acceptTuple = highestAcceptNum
-						self.acceptVal = highestAcceptVal
-					print "Setting acceptNum to ", self.acceptTuple, self.acceptVal
-					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an accept message
-							print ("Sent Accept message to node ", dest_id)
-							msg = Message(self.id, self.ballot, None, self.acceptVal, self.index, self.id, None, Message.ACCEPT, None) #MAY CAUSE ERROR CAUSE SELF.INDEX IS NOT ACCURATE
-							sock.send(str(msg))	
+				if highestAcceptNum == "0,0": #None of the msgs have acceptNum set already
+					self.acceptTuple = self.ackarray[0].ballot
+					self.acceptVal = self.proposedFile
+					#self.acceptVal = self.ackarray[0].acceptVal
+				else: 
+					self.acceptTuple = highestAcceptNum
+					self.acceptVal = highestAcceptVal
+				print "Setting acceptNum to ", self.acceptTuple, self.acceptVal
+				for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an accept message
+						print ("Sent Accept message to node ", dest_id)
+						msg = Message(self.id, self.ballot, None, self.acceptVal, self.index, self.id, None, Message.ACCEPT, None) #MAY CAUSE ERROR CAUSE SELF.INDEX IS NOT ACCURATE
+						sock.send(str(msg))	
 			
 			else: 
 				time.sleep(randint(10,30)/10.0)
@@ -446,7 +451,8 @@ class Prm(object):
 			time.sleep(0.5)
 			counter = 0
 			for msg in self.acceptarray: 
-				if msg.originalPRM == self.id:
+				print msg.acceptVal 
+				if (msg.originalPRM == self.id) and (msg.acceptVal == self.proposedFile):
 					counter += 1
 			print "Checking to see if I have Majority Accepts..."
 
@@ -461,7 +467,7 @@ class Prm(object):
 						msg = Message(self.id, self.ballot, None, None, self.index, self.id, self.proposedFile, Message.DECIDE, self.proposedDictionary)
 						sock.send(str(msg))	
 					print "ADDING TO LOG", self.proposedFile, self.index
-					self.addToLog(self.proposedFile, self. proposedDictionary, self.index)
+					self.addToLog(self.proposedFile, self.proposedDictionary, self.index)
 					#periodically send updates to all other nodes
 					sendUpdatesThread = threading.Thread(target = self.sendUpdates, args=(self.index-1,))
 					sendUpdatesThread.daemon = True
@@ -497,14 +503,19 @@ class Prm(object):
 			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an update message
 				#print ("Sending Update Message to node ", dest_id)
 				msg = Message(self.id, self.ballot, None, None, index, None, self.log[index], Message.UPDATE, self.logDictionary[index])
-				sock.send(str(msg))	    	
+				sock.send(str(msg))	  
+
+		print self.logDictionary  	
 	
 	def checkHeartBeat(self):
 		time.sleep(0.4)
 		counter = 0
 		if not self.isDecided:
+			for alive in self.heartBeat:
+					if alive:
+						counter += 1
 			while (counter) < 0.5*(self.num_nodes+1):
-				self.heartBeat = [False]*15
+				#self.heartBeat = [False]*15
 				counter = 0
 				for alive in self.heartBeat:
 					if alive:
@@ -514,7 +525,7 @@ class Prm(object):
 					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
 						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE, None)
 						sock.send(str(msg))	  
-
+	
 
 	def addToLog(self, value, dictionary, index): #if get an update with higher index than your log, resize
 		try: 
