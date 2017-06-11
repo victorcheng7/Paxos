@@ -488,7 +488,7 @@ class Prm(object):
 						#self.proposedFile is None because it got reset already
 						msg = Message(self.id, self.ballot, None, None, self.index, self.id, self.proposedFile, Message.DECIDE, self.proposedDictionary)
 						sock.sendall(str(len(str(msg.encode('utf-8')) + '||')
-						print "OWEJFOWIEJFOI", len(str(msg.encode('utf-8'))
+						print len(str(msg.encode('utf-8'))
 						sock.sendall(str(msg))	
 					print "ADDING TO LOG", self.proposedFile, self.index
 					self.addToLog(self.proposedFile, self.proposedDictionary, self.index)
