@@ -50,13 +50,13 @@ def commThread(prm):
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
 				data = con.recv(1024)
-				try:
-					for msg in Message.split(data):
+				for msg in Message.split(data):
+					try:
 						msg = Message.reconstructFromString(msg.strip())
 						if msg.msgType == Message.ISDECIDEDFALSE:
 							prm.isDecided = False 
-				except Exception:
-					continue
+					except Exception:
+						continue
 					
 				if prm.listening and not prm.isDecided:
 					#incoming messages from other PRMS
@@ -70,6 +70,11 @@ def commThread(prm):
 							prm.outgoing_channels[msg.source_id].send(str(heartBeatMsg))
 							
 							if msg.index < prm.index: 
+								try:
+									updateMessage = Message(prm.id, prm.ballot, None, None, prm.index, prm.proposedFile, None, Message.UPDATE, None)
+									socke.send(updateMessage)
+								except Exception:
+									pass
 								print "The index you proposed has already been set in the log"
 							else:
 								msgBallotTuple = msg.ballot.split(",") # ex "1,0"
@@ -120,6 +125,11 @@ def commThread(prm):
 							print "INSIDE OF Message.DECIDE receive from ", msg.source_id
 							prm.isDecided = True
 							if msg.index > prm.index:
+								try:
+									askForUpdate = Message(prm.id, prm.ballot, None, None, prm.index, None, None, Message.UPDATE, None)
+									socke.send(updateMessage)
+								except Exception:
+									pass
 								print "The index you proposed has already been set in the log"
 								#send(prm.id, prm.index, "UPDATE") to msg.originalPRM
 							elif msg.index == prm.index: 
