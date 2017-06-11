@@ -392,7 +392,7 @@ class Prm(object):
 		self.checkingMajorityAcks = False
 		self.checkingMajorityAccepts = False
 		self.heartBeat = [False]*15
-		self.heartBeat[self.id-1] = True
+		self.heartBeat[self.id-5001] = True
 
 
 	def stop():
