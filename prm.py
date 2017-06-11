@@ -188,10 +188,9 @@ def commThread(prm):
 						count = 0
 						for num in splitData[1:]:
 							pos = int(num)
-							file = open(prm.log[pos], "r")
-							for line in file:
-								count += int(line.strip('\n\r').split()[1])
-							file.close()
+							word_dict = prm.logDictionary[pos]
+							for word, freq in word_dict.iteritems():
+								count += freq
 
 						print "Total word count is {0}".format(count)
 
@@ -199,32 +198,24 @@ def commThread(prm):
 						print "Error: Invalid indices, log has only {0} entries.".format(len(prm.log))
 
 				elif splitData[0] == "merge":
-					word_dict = {}
+					merged_dict = {}
 
 					try:
-						word_dict = {}
+						merged_dict = {}
 						for num in splitData[1:]:
 							pos = int(num)
-							file = open(prm.log[pos], "r")
+							word_dict = prm.logDictionary[pos]
 
-							for line in file:
-								lineSplit = line.strip('\n\r').split()
-
-								word = lineSplit[0]
-								count = int(lineSplit[1])
-
-								if word in word_dict:
-									word_dict[word] += count
+							for word, freq in word_dict.iteritems():
+								if word in merged_dict:
+									merged_dict[word] += freq
 								else:
-									word_dict[word] = count
-							file.close()
-
-
+									merged_dict[word] = freq
 
 						print "Word List"
 						print "---------------------"
 
-						for key, val in word_dict.iteritems():
+						for key, val in merged_dict.iteritems():
 							print "{0} {1}".format(key, val)
 
 					except:
