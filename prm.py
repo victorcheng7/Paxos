@@ -49,7 +49,7 @@ def commThread(prm):
 	while True:
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
-				data = con.recv(150000) # change this according to the message
+				data = con.recv(500000) # change this according to the message
 				for msg in Message.split(data):
 					try:
 						msg = Message.reconstructFromString(msg.strip())
@@ -515,8 +515,6 @@ class Prm(object):
 				#print ("Sending Update Message to node ", dest_id)
 				msg = Message(self.id, self.ballot, None, None, index, None, self.log[index], Message.UPDATE, self.logDictionary[index])
 				sock.send(str(msg))	  
-
-		print self.logDictionary  	
 	
 	def checkHeartBeat(self):
 		time.sleep(0.4)
