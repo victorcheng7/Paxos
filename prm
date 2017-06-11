@@ -56,17 +56,18 @@ def commThread(prm):
 				size = 150000
 				#size = 1024
 				#data = con.recv(10000000) # change this according to the message
-				for msg in Message.split(data):
-					try:
-						msg = Message.reconstructFromString(msg.strip())
-						if msg.msgType == Message.ISDECIDEDFALSE:
-							prm.isDecided = False 
-					except Exception:
-						'''
+					for msg in Message.split(data):
+						try:
+							msg = Message.reconstructFromString(msg.strip())
+							if msg.msgType == Message.ISDECIDEDFALSE:
+								prm.isDecided = False 
+						except Exception:
+							'''
 							if message is byte size, set the byte size expectation to while loop that number until reaches
-							num/1024 at a time OR it doesn't get anything in the next gap iteration
-						'''
-						continue
+								num/1024 at a time OR it doesn't get anything in the next gap iteration
+							'''
+							continue
+
 					
 					if prm.listening and not prm.isDecided:
 						#incoming messages from other PRMS
@@ -487,7 +488,7 @@ class Prm(object):
 						print ("Sent Decide message to node ", dest_id)
 						#self.proposedFile is None because it got reset already
 						msg = Message(self.id, self.ballot, None, None, self.index, self.id, self.proposedFile, Message.DECIDE, self.proposedDictionary)
-						sock.sendall(len(str(msg.encode('utf-8')))
+						sock.sendall(len(str(msg.encode('utf-8'))
 						print "OWEJFOWIEJFOI", len(str(msg.encode('utf-8'))
 						sock.sendall(str(msg))	
 					print "ADDING TO LOG", self.proposedFile, self.index
