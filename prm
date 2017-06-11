@@ -117,6 +117,7 @@ def commThread(prm):
 							else: #you're not the original Proposer
 								if msg.index == prm.index: 
 									if (msg.ballot >= prm.ballot) and (msg.ballot not in prm.seenballotarray) and (not prm.isDecided): #first time, relay message
+										prm.ballot = msg.ballot
 										prm.acceptTuple = msg.ballot 
 										prm.acceptVal = msg.acceptVal
 										prm.seenballotarray.append(msg.ballot)

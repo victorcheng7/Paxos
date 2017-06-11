@@ -60,10 +60,11 @@ def commThread(prm):
 				else:
 					newsize = q.get()[1]
 					while (newsize > 0):
-						data = con.recv(1024)
+						data += con.recv(1024)
 						newsize -= 1024
 				#data = con.recv(10000000) # change this according to the message
 				for msg in Message.split(data):
+					data = ""
 					try:
 						msg = Message.reconstructFromString(msg.strip())
 						if msg.msgType == Message.ISDECIDEDFALSE:
