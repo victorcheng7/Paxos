@@ -52,7 +52,7 @@ def commThread(prm):
 	while True:
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
-				if q.empty() or (!q.empty() and (source_id != q.get()[0]))
+				if q.empty() or (not q.empty() and (source_id != q.get()[0]))
 					while (size > 0):
 						data = con.recv(1024)
 						size -= 1024
