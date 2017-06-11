@@ -382,6 +382,7 @@ class Prm(object):
 
 	def newRoundCleanUp(self):
 		self.proposedFile = None
+		self.proposedDictionary = {}
 		self.ballot = "0," + str(self.id) 
 		#self.ballot = [0, site_id]
 		self.acceptTuple = "0,0"
