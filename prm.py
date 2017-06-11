@@ -47,7 +47,7 @@ def commThread(prm):
 	prm.cli[1].sendall("finishedSetup")
 
 	#size = 150000
-	size1 = 1024
+	size = 1024
 	while True:
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:

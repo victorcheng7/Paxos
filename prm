@@ -52,16 +52,16 @@ def commThread(prm):
 				data = con.recv(10000000)
 				#data = con.recv(10000000) # change this according to the message
 				for msg in Message.split(data):
-					try:
-						msg = Message.reconstructFromString(msg.strip())
-						if msg.msgType == Message.ISDECIDEDFALSE:
-							prm.isDecided = False 
-					except Exception:
-						#try:
-						#	size = int(msg)
-						#except Exception:
-							#print "Error on parsing size and changing the size"
-						continue
+				#try:
+					msg = Message.reconstructFromString(msg.strip())
+					if msg.msgType == Message.ISDECIDEDFALSE:
+						prm.isDecided = False 
+				#except Exception:
+					#try:
+					#	size = int(msg)
+					#except Exception:
+						#print "Error on parsing size and changing the size"
+					#continue
 
 					
 					if prm.listening and not prm.isDecided:
@@ -584,7 +584,7 @@ class Prm(object):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.listeningSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.listeningSocket.bind( (IP, port) )
-		self.listeningSocket.settimeout(0.2)
+		self.listeningSocket.settimeout(0.4)
 		#self.listeningSocket.setblocking(0) 
 		self.listeningSocket.listen(1)
 		self.listening = True
