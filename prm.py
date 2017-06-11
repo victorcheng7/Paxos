@@ -5,6 +5,7 @@ import threading
 import sys
 import Queue
 import copy
+import json
 from random import randint
 
 def main():
@@ -65,7 +66,7 @@ def commThread(prm):
 						if msg.msgType == Message.PREPARE:
 							print ("Received Prepare Message from ", msg.source_id, msg.ballot, msg.index, msg.originalPRM, msg.msgType)
 
-							heartBeatMsg = Message(prm.id, prm.ballot, None, None, prm.index, None, None, Message.HEARTBEAT)
+							heartBeatMsg = Message(prm.id, prm.ballot, None, None, prm.index, None, None, Message.HEARTBEAT, None)
 							prm.outgoing_channels[msg.source_id].send(str(heartBeatMsg))
 							
 							if msg.index < prm.index: 
@@ -75,7 +76,7 @@ def commThread(prm):
 								prmBallotTuple = prm.ballot.split(",") # ex. "1,0"
 								if ((msgBallotTuple[0] > prmBallotTuple[0]) or ((msgBallotTuple[0] == prmBallotTuple[0]) and (msgBallotTuple[1] > prmBallotTuple[1]))): #is ballot > local ballot
 							   		prm.ballot = msg.ballot
-									ackMsg = Message(prm.id, prm.ballot, prm.acceptTuple, prm.acceptVal, msg.index, msg.originalPRM, None, Message.ACK)
+									ackMsg = Message(prm.id, prm.ballot, prm.acceptTuple, prm.acceptVal, msg.index, msg.originalPRM, None, Message.ACK, None)
 
 									prm.outgoing_channels[msg.source_id].send(str(ackMsg)) #send prepare message to original proposer
 									print ("Sent Ack message to node ", dest_id)
@@ -110,7 +111,7 @@ def commThread(prm):
 										prm.seenballotarray.append(msg.ballot)
 										print ("Relay Accept message to all other nodes")
 										for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
-											msg = Message(prm.id, prm.ballot, None, prm.acceptVal, msg.index, msg.originalPRM, None, Message.ACCEPT)
+											msg = Message(prm.id, prm.ballot, None, prm.acceptVal, msg.index, msg.originalPRM, None, Message.ACCEPT, None)
 											sock.send(str(msg))	
 											print ("Sent Accept message to node ", dest_id)
 									
@@ -122,7 +123,7 @@ def commThread(prm):
 								print "The index you proposed has already been set in the log"
 								#send(prm.id, prm.index, "UPDATE") to msg.originalPRM
 							elif msg.index == prm.index: 
-								prm.addToLog(msg.log, msg.index) #filename into log
+								prm.addToLog(msg.log, msg.logDictionary, msg.index) #filename into log
 								prm.newRoundCleanUp()
 								#send the cli that you've finished replicating and what the log entry will be
 								prm.cli[1].send("finishReplicating " + str(msg.index) + " " + prm.log[msg.index])
@@ -130,7 +131,7 @@ def commThread(prm):
 
 						if msg.msgType == Message.UPDATE:
 							#print "Updated message received"
-							prm.addToLog(msg.log, msg.index)
+							prm.addToLog(msg.log, msg.logDictionary, msg.index)
 							#once you updated your log, send back the update source_id that you've completed and stop sending once everyone is updated, prm.updatedarray keep track of state on how many are updated
 						
 
@@ -152,29 +153,20 @@ def commThread(prm):
 					time.sleep(1)
 					prm.isDecided = False
 					for dest_id, sock in prm.outgoing_channels.iteritems():
-						msg = Message(prm.id, prm.ballot, None, None, prm.index, None, None, Message.ISDECIDEDFALSE)
+						msg = Message(prm.id, prm.ballot, None, None, prm.index, None, None, Message.ISDECIDEDFALSE, None)
 						sock.send(str(msg))
 					prm.proposedFile = splitData[1]
 
-					try:
-						print prm.proposedFile
-						file = open(prm.proposedFile, "r")
-						for line in file:
-							print "hello"
-							keyWord = line.split(" ")
-							prm.proposedDictionary[keyWord[0]] = keyWord[1]
-							print keyWord[0] keyWord[1]
-						file.close()
-					except:
-						print "Error: Invalid indices, log has only {0} entries.".format(len(prm.log))
+					file = open(prm.proposedFile, "r")
+					for line in file:
+						keyWord = line.split(" ")
+						prm.proposedDictionary[keyWord[0]] = int(keyWord[1])
+					file.close()
 					
-					for word, count in prm.proposedDictionary.iteritems():
-						print word, count
-
 					prm.incrementBallot()
 					for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
 						print ("Sent Prepare message to node ", dest_id)
-						msg = Message(prm.id, prm.ballot, None, prm.proposedFile, prm.index, prm.id, None, Message.PREPARE)
+						msg = Message(prm.id, prm.ballot, None, prm.proposedFile, prm.index, prm.id, None, Message.PREPARE, None)
 						sock.send(str(msg)) 
 					checkHeartBeat = threading.Thread(target = prm.checkHeartBeat)
 					checkHeartBeat.daemon = True
@@ -289,7 +281,7 @@ class Message(object):
 	ISDECIDEDFALSE = 5
 	HEARTBEAT = 6
 	#NEEDUPDATE = 5
-	def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, logDictionary, msgType):
+	def __init__(self, source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, msgType, logDictionary):
 		self.source_id = source_id
 		self.ballot = ballot
 		self.acceptTuple = acceptTuple
@@ -298,7 +290,10 @@ class Message(object):
 		self.originalPRM = originalPRM
 		self.log = log
 		self.msgType = msgType
-		self.logDictionary = logDictionary
+		if logDictionary != None:
+			self.logDictionary = logDictionary.copy()
+		else:
+			self.logDictionary = None
 
 	def __str__(self):
 		res = str(self.source_id) + "&" + str(self.ballot) + "&" + str(self.index) + "&" + str(self.msgType) 
@@ -311,7 +306,8 @@ class Message(object):
 		if self.log != None:
 			res += "&" + str(self.log)
 		if self.logDictionary != None:
-			res += "&" + str(self.logDictionary)
+			data_string = json.dumps(self.logDictionary)
+			res += "&" + data_string
 		res += "||"
 		return res
 
@@ -330,6 +326,7 @@ class Message(object):
 		acceptVal = None
 		originalPRM = None
 		log = None
+		logDictionary = None
 		if msgType == Message.PREPARE: 
 			acceptVal = keyWords[4]
 			originalPRM = int(keyWords[5])
@@ -343,10 +340,10 @@ class Message(object):
 		if msgType == Message.DECIDE:
 			originalPRM = int(keyWords[4])
 			log = keyWords[5]
-			logDictionary = keyWords[6]
+			logDictionary = json.loads(keyWords[6])
 		if msgType == Message.UPDATE:
 			log = keyWords[4]		
-			logDictionary = keyWords[5]
+			logDictionary = json.loads(keyWords[5])
 		return Message(source_id, ballot, acceptTuple, acceptVal, index, originalPRM, log, msgType, logDictionary)
 
 	@staticmethod
@@ -371,7 +368,7 @@ class Prm(object):
 
 		self.isDecided = False
 		self.proposedFile = None
-		self.proposedDictionary = None
+		self.proposedDictionary = {}
 		self.num_nodes = 0
 		self.heartBeat = [False]*15
 		self.heartBeat[self.id-1] = True
@@ -438,7 +435,7 @@ class Prm(object):
 					print "Setting acceptNum to ", self.acceptTuple, self.acceptVal
 					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an accept message
 							print ("Sent Accept message to node ", dest_id)
-							msg = Message(self.id, self.ballot, None, self.acceptVal, self.index, self.id, None, Message.ACCEPT) #MAY CAUSE ERROR CAUSE SELF.INDEX IS NOT ACCURATE
+							msg = Message(self.id, self.ballot, None, self.acceptVal, self.index, self.id, None, Message.ACCEPT, None) #MAY CAUSE ERROR CAUSE SELF.INDEX IS NOT ACCURATE
 							sock.send(str(msg))	
 			
 			else: 
@@ -447,7 +444,7 @@ class Prm(object):
 				if not self.isDecided:
 					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
 						print ("Sending Repropose to node ", dest_id)
-						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
+						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE, None)
 						sock.send(str(msg))		
 			
 			self.checkingMajorityAcks = False
@@ -470,10 +467,10 @@ class Prm(object):
 					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a decide message
 						print ("Sent Decide message to node ", dest_id)
 						#self.proposedFile is None because it got reset already
-						msg = Message(self.id, self.ballot, None, None, self.index, self.id, self.proposedFile, Message.DECIDE)
+						msg = Message(self.id, self.ballot, None, None, self.index, self.id, self.proposedFile, Message.DECIDE, self.proposedDictionary)
 						sock.send(str(msg))	
 					print "ADDING TO LOG", self.proposedFile, self.index
-					self.addToLog(self.proposedFile, self.index)
+					self.addToLog(self.proposedFile, self. proposedDictionary, self.index)
 					#periodically send updates to all other nodes
 					sendUpdatesThread = threading.Thread(target = self.sendUpdates, args=(self.index-1,))
 					sendUpdatesThread.daemon = True
@@ -496,7 +493,7 @@ class Prm(object):
 				if not self.isDecided:
 					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
 						print ("Sending Prepare to node ", dest_id)
-						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
+						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE, None)
 						sock.send(str(msg))	
 			
 			self.checkingMajorityAccepts = False
@@ -508,7 +505,7 @@ class Prm(object):
 			time.sleep(1)
 			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an update message
 				#print ("Sending Update Message to node ", dest_id)
-				msg = Message(self.id, self.ballot, None, None, index, None, self.log[index], Message.UPDATE)
+				msg = Message(self.id, self.ballot, None, None, index, None, self.log[index], Message.UPDATE, self.logDictionary[index])
 				sock.send(str(msg))	    	
 	
 	def checkHeartBeat(self):
@@ -524,23 +521,30 @@ class Prm(object):
 				time.sleep(0.2)
 				if not self.isDecided:
 					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
-						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE)
+						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE, None)
 						sock.send(str(msg))	  
 
 
-	def addToLog(self, value, index): #if get an update with higher index than your log, resize
+	def addToLog(self, value, dictionary, index): #if get an update with higher index than your log, resize
 		try: 
 			if self.log[index] == None:
 				self.log[index] = value
+				self.logDictionary[index] = dictionary
 				self.index += 1
 		except Exception: 
 			temp = [None]*(index+1)
+			temp2 = [None]*(index+1)
 			counter = 0
 			for logValue in self.log:
 				temp[counter] = logValue
 				counter += 1
+			counter = 0
+			for logDictionary in self.logDictionary:
+				temp2[counter] = logDictionary
 			temp[index] = value
+			temp2[index] = dictionary
 			self.log = temp[:]
+			self.logDictionary = temp2[:]
 			self.index += 1
 
 
