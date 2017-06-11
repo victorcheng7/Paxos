@@ -46,15 +46,14 @@ def commThread(prm):
 	prm.cli[1].sendall("finishedSetup")
 
 	#size = 150000
-	#size = 1024
+	size = 1024
 	while True:
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
-				#while (size > 0):
-				data = con.recv(1024)
-				#size -= 1024
-				#size = 150000
-				#size = 1024
+				while (size > 0):
+					data = con.recv(1024)
+					size -= 1024
+				size = 1024
 				#data = con.recv(10000000) # change this according to the message
 				for msg in Message.split(data):
 					try:
@@ -62,10 +61,10 @@ def commThread(prm):
 						if msg.msgType == Message.ISDECIDEDFALSE:
 							prm.isDecided = False 
 					except Exception:
-						#try:
-						#	size = int(msg)
-						#except Exception:
-						#	print "Error on parsing size and changing the size"
+						try:
+							size = int(msg)
+						except Exception:
+							print "Error on parsing size and changing the size"
 						continue
 
 					
@@ -488,13 +487,13 @@ class Prm(object):
 						print ("Sent Decide message to node ", dest_id)
 						#self.proposedFile is None because it got reset already
 						msg = Message(self.id, self.ballot, None, None, self.index, self.id, self.proposedFile, Message.DECIDE, self.proposedDictionary)
-						#sock.sendall(str(len(str(msg.encode('utf-8')) + '||')
-						#print "OWEJFOWIEJFOI", len(str(msg.encode('utf-8'))
+						sock.sendall(str(len(str(msg.encode('utf-8')) + '||')))
+						print "JOJOJOIJOIJ", len(str(msg.encode('utf-8')))
 						sock.sendall(str(msg))	
 					print "ADDING TO LOG", self.proposedFile, self.index
 					self.addToLog(self.proposedFile, self.proposedDictionary, self.index)
 					#periodically send updates to all other nodes
-					sendUpdatesThread = threading.Thread(target = self.sendallUpdates, args=(self.index-1,))
+					sendUpdatesThread = threading.Thread(target = self.sendUpdates, args=(self.index-1,))
 					sendUpdatesThread.daemon = True
 					sendUpdatesThread.start()
 					
