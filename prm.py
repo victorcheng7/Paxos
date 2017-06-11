@@ -532,7 +532,7 @@ class Prm(object):
 			
 			self.checkingMajorityAccepts = False
 			self.acceptarray = []
-	
+	'''
 	def sendUpdates(self, index):
 		print "Inside of sendUpdates"
 		while True:
@@ -541,7 +541,7 @@ class Prm(object):
 				#print ("Sending Update Message to node ", dest_id)
 				msg = Message(self.id, self.ballot, None, None, index, None, self.log[index], Message.UPDATE, self.logDictionary[index])
 				sock.sendall(str(msg))	  
-	
+	'''
 	def checkHeartBeat(self):
 		time.sleep(0.4)
 		counter = 0
