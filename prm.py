@@ -25,7 +25,7 @@ def commThread(prm):
 	while (len(prm.incoming_channels) < (prm.num_nodes-1)) or prm.cli[0] == None:
 		for con in prm.incoming_channels_unordered:
 			try:
-				data = con.recv(1000000)
+				data = con.recv(1024)
 				if data == "confirmInit":
 					prm.cli[0] = con
 					for dest_id, sock in prm.outgoing_channels.iteritems():
