@@ -56,7 +56,6 @@ def commThread(prm):
 						if msg.msgType == Message.ISDECIDEDFALSE:
 							prm.isDecided = False 
 					except Exception:
-						print "reconstructFromString errror"
 						continue
 					
 					if prm.listening and not prm.isDecided:
