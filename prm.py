@@ -29,7 +29,7 @@ def commThread(prm):
 				if data == "confirmInit":
 					prm.cli[0] = con
 					for dest_id, sock in prm.outgoing_channels.iteritems():
-						sock.send("sendID from {0}".format(prm.id))
+						sock.sendall("sendID from {0}".format(prm.id))
 
 				# add to ordered incoming channels 
 				elif data.split()[0] == "sendID":
@@ -43,110 +43,121 @@ def commThread(prm):
 	prm.cli[1] = prm.outgoing_channels[prm.id]
 	prm.outgoing_channels.pop(prm.id, None)
 	prm.incoming_channels.pop(prm.cli[0], None)
-	prm.cli[1].send("finishedSetup")
+	prm.cli[1].sendall("finishedSetup")
 
-
+	size = 150000
+	#size = 1024
 	while True:
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
-				data = con.recv(1000000) # change this according to the message
+				#while (size > 0):
+				data = con.recv(1024)
+				size -= 1024
+				#size = 150000
+				#size = 1024
+				#data = con.recv(10000000) # change this according to the message
 				for msg in Message.split(data):
 					try:
 						msg = Message.reconstructFromString(msg.strip())
 						if msg.msgType == Message.ISDECIDEDFALSE:
 							prm.isDecided = False 
 					except Exception:
+						try:
+							size = int(msg)
+						except Exception:
+							print "Error on parsing size and changing the size"
 						continue
+
 					
-					if prm.listening and not prm.isDecided:
-						#incoming messages from other PRMS
-						#for msg in Message.split(data):
-						#msg = Message.reconstructFromString(msg.strip())
+				if prm.listening and not prm.isDecided:
+					#incoming messages from other PRMS
+					#for msg in Message.split(data):
+					#msg = Message.reconstructFromString(msg.strip())
 
-						if msg.msgType == Message.PREPARE:
-							print ("Received Prepare Message from ", msg.source_id, msg.ballot, msg.index, msg.originalPRM, msg.msgType)
+					if msg.msgType == Message.PREPARE:
+						print ("Received Prepare Message from ", msg.source_id, msg.ballot, msg.index, msg.originalPRM, msg.msgType)
 
-							heartBeatMsg = Message(prm.id, prm.ballot, None, None, prm.index, None, None, Message.HEARTBEAT, None)
-							prm.outgoing_channels[msg.source_id].send(str(heartBeatMsg))
-							
-							if msg.index < prm.index: 
-								try:
-									updateMessage = Message(prm.id, prm.ballot, None, None, prm.index, prm.proposedFile, None, Message.UPDATE, None)
- 									socke.send(updateMessage)
-								except Exception:
-									pass
-								print "The index you proposed has already been set in the log"
-							else:
-								msgBallotTuple = msg.ballot.split(",") # ex "1,0"
-								prmBallotTuple = prm.ballot.split(",") # ex. "1,0"
-								if ((msgBallotTuple[0] > prmBallotTuple[0]) or ((msgBallotTuple[0] == prmBallotTuple[0]) and (msgBallotTuple[1] > prmBallotTuple[1]))): #is ballot > local ballot
-							   		prm.ballot = msg.ballot
-									ackMsg = Message(prm.id, prm.ballot, prm.acceptTuple, prm.acceptVal, msg.index, msg.originalPRM, None, Message.ACK, None)
-
-									prm.outgoing_channels[msg.source_id].send(str(ackMsg)) #send prepare message to original proposer
-									print ("Sent Ack message to node ", dest_id)
-
-
-						if msg.msgType == Message.ACK:
-							print ("Received ACK Message from ", msg.source_id, msg.ballot, prm.acceptTuple, prm.acceptVal, msg.index, msg.originalPRM, msg.log, msg.msgType)
-							if not prm.checkingMajorityAcks: 
-								prm.checkingMajorityAcks = True
-								prm.ackarray.append(msg)
-								majorityAckThread = threading.Thread(target=prm.checkMajorityAcks)
-								majorityAckThread.daemon = True
-								majorityAckThread.start()
-							else:
-								prm.ackarray.append(msg)
-
-
-						if msg.msgType == Message.ACCEPT:
-							print "inside of Message.ACCEPT receive"
-							if prm.id == msg.originalPRM: #Am I the original proposer?, check for majority Accepts
-								if not prm.checkingMajorityAccepts:
-									prm.checkingMajorityAccepts = True
-									majorityAcceptThread = threading.Thread(target=prm.checkMajorityAccepts)
-									majorityAcceptThread.daemon = True
-									majorityAcceptThread.start()
-								prm.acceptarray.append(msg)
-							else: #you're not the original Proposer
-								if msg.index == prm.index: 
-									if (msg.ballot >= prm.ballot) and (msg.ballot not in prm.seenballotarray) and (not prm.isDecided): #first time, relay message
-										prm.acceptTuple = msg.ballot 
-										prm.acceptVal = msg.acceptVal
-										prm.seenballotarray.append(msg.ballot)
-										print ("Relay Accept message to all other nodes")
-										for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
-											msg = Message(prm.id, prm.ballot, None, prm.acceptVal, msg.index, msg.originalPRM, None, Message.ACCEPT, None)
-											sock.send(str(msg))	
-											print ("Sent Accept message to node ", dest_id)
-									
-							
-						if msg.msgType == Message.DECIDE:
-							print "INSIDE OF Message.DECIDE receive from ", msg.source_id
-							prm.isDecided = True
-							if msg.index > prm.index:
-								try:
-									updateMessage = Message(prm.id, prm.ballot, None, None, prm.index, prm.proposedFile, None, Message.UPDATE, None)
- 									socke.send(updateMessage)
-								except Exception:
-									pass
-								print "The index you proposed has already been set in the log"
-								#send(prm.id, prm.index, "UPDATE") to msg.originalPRM
-							elif msg.index == prm.index: 
-								prm.addToLog(msg.log, msg.logDictionary, msg.index) #filename into log
-								prm.newRoundCleanUp()
-								#send the cli that you've finished replicating and what the log entry will be
-								prm.cli[1].send("finishReplicating " + str(msg.index) + " " + prm.log[msg.index])
-
-
-						if msg.msgType == Message.UPDATE:
-							#print "Updated message received"
-							prm.addToLog(msg.log, msg.logDictionary, msg.index)
-							#once you updated your log, send back the update source_id that you've completed and stop sending once everyone is updated, prm.updatedarray keep track of state on how many are updated
+						heartBeatMsg = Message(prm.id, prm.ballot, None, None, prm.index, None, None, Message.HEARTBEAT, None)
+						prm.outgoing_channels[msg.source_id].sendall(str(heartBeatMsg))
 						
+						if msg.index < prm.index: 
+							try:
+								updateMessage = Message(prm.id, prm.ballot, None, None, prm.index, prm.proposedFile, None, Message.UPDATE, None)
+								socke.sendall(updateMessage)
+							except Exception:
+								pass
+							print "The index you proposed has already been set in the log"
+						else:
+							msgBallotTuple = msg.ballot.split(",") # ex "1,0"
+							prmBallotTuple = prm.ballot.split(",") # ex. "1,0"
+							if ((msgBallotTuple[0] > prmBallotTuple[0]) or ((msgBallotTuple[0] == prmBallotTuple[0]) and (msgBallotTuple[1] > prmBallotTuple[1]))): #is ballot > local ballot
+						   		prm.ballot = msg.ballot
+								ackMsg = Message(prm.id, prm.ballot, prm.acceptTuple, prm.acceptVal, msg.index, msg.originalPRM, None, Message.ACK, None)
 
-						if msg.msgType == Message.HEARTBEAT:
-							prm.heartBeat[msg.source_id-1] = True
+								prm.outgoing_channels[msg.source_id].sendall(str(ackMsg)) #send prepare message to original proposer
+								print ("Sent Ack message to node ", dest_id)
+
+
+					if msg.msgType == Message.ACK:
+						print ("Received ACK Message from ", msg.source_id, msg.ballot, prm.acceptTuple, prm.acceptVal, msg.index, msg.originalPRM, msg.log, msg.msgType)
+						if not prm.checkingMajorityAcks: 
+							prm.checkingMajorityAcks = True
+							prm.ackarray.append(msg)
+							majorityAckThread = threading.Thread(target=prm.checkMajorityAcks)
+							majorityAckThread.daemon = True
+							majorityAckThread.start()
+						else:
+							prm.ackarray.append(msg)
+
+
+					if msg.msgType == Message.ACCEPT:
+						print "inside of Message.ACCEPT receive"
+						if prm.id == msg.originalPRM: #Am I the original proposer?, check for majority Accepts
+							if not prm.checkingMajorityAccepts:
+								prm.checkingMajorityAccepts = True
+								majorityAcceptThread = threading.Thread(target=prm.checkMajorityAccepts)
+								majorityAcceptThread.daemon = True
+								majorityAcceptThread.start()
+							prm.acceptarray.append(msg)
+						else: #you're not the original Proposer
+							if msg.index == prm.index: 
+								if (msg.ballot >= prm.ballot) and (msg.ballot not in prm.seenballotarray) and (not prm.isDecided): #first time, relay message
+									prm.acceptTuple = msg.ballot 
+									prm.acceptVal = msg.acceptVal
+									prm.seenballotarray.append(msg.ballot)
+									print ("Relay Accept message to all other nodes")
+									for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
+										msg = Message(prm.id, prm.ballot, None, prm.acceptVal, msg.index, msg.originalPRM, None, Message.ACCEPT, None)
+										sock.sendall(str(msg))	
+										print ("Sent Accept message to node ", dest_id)
+								
+						
+					if msg.msgType == Message.DECIDE:
+						print "INSIDE OF Message.DECIDE receive from ", msg.source_id
+						prm.isDecided = True
+						if msg.index > prm.index:
+							try:
+								updateMessage = Message(prm.id, prm.ballot, None, None, prm.index, prm.proposedFile, None, Message.UPDATE, None)
+									socke.sendall(updateMessage)
+							except Exception:
+								pass
+							print "The index you proposed has already been set in the log"
+							#send(prm.id, prm.index, "UPDATE") to msg.originalPRM
+						elif msg.index == prm.index: 
+							prm.addToLog(msg.log, msg.logDictionary, msg.index) #filename into log
+							prm.newRoundCleanUp()
+							#send the cli that you've finished replicating and what the log entry will be
+							prm.cli[1].sendall("finishReplicating " + str(msg.index) + " " + prm.log[msg.index])
+
+
+					if msg.msgType == Message.UPDATE:
+						#print "Updated message received"
+						prm.addToLog(msg.log, msg.logDictionary, msg.index)
+						#once you updated your log, send back the update source_id that you've completed and stop sending once everyone is updated, prm.updatedarray keep track of state on how many are updated
+					
+
+					if msg.msgType == Message.HEARTBEAT:
+						prm.heartBeat[msg.source_id-1] = True
 
 			except socket.error, e:
 				continue
@@ -164,7 +175,7 @@ def commThread(prm):
 					prm.isDecided = False
 					for dest_id, sock in prm.outgoing_channels.iteritems():
 						msg = Message(prm.id, prm.ballot, None, None, prm.index, None, None, Message.ISDECIDEDFALSE, None)
-						sock.send(str(msg))
+						sock.sendall(str(msg))
 					prm.proposedFile = splitData[1]
 
 					file = open(prm.proposedFile, "r")
@@ -177,7 +188,7 @@ def commThread(prm):
 					for dest_id, sock in prm.outgoing_channels.iteritems():#Send all prms a prepare message
 						print ("Sent Prepare message to node ", dest_id)
 						msg = Message(prm.id, prm.ballot, None, prm.proposedFile, prm.index, prm.id, None, Message.PREPARE, None)
-						sock.send(str(msg)) 
+						sock.sendall(str(msg)) 
 					checkHeartBeat = threading.Thread(target = prm.checkHeartBeat)
 					checkHeartBeat.daemon = True
 					checkHeartBeat.start()
@@ -238,7 +249,7 @@ def commThread(prm):
 				#send a message to all PRMs asking for updates
 			
 			else:
-				prm.cli[1].send("stopped")
+				prm.cli[1].sendall("stopped")
 		except socket.error, e:
 			pass
 
@@ -444,7 +455,7 @@ class Prm(object):
 					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an accept message
 							print ("Sent Accept message to node ", dest_id)
 							msg = Message(self.id, self.ballot, None, self.acceptVal, self.index, self.id, None, Message.ACCEPT, None) #MAY CAUSE ERROR CAUSE SELF.INDEX IS NOT ACCURATE
-							sock.send(str(msg))	
+							sock.sendall(str(msg))	
 			
 			else: 
 				time.sleep(randint(10,30)/10.0)
@@ -453,7 +464,7 @@ class Prm(object):
 					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
 						print ("Sending Repropose to node ", dest_id)
 						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE, None)
-						sock.send(str(msg))		
+						sock.sendall(str(msg))		
 			
 			self.checkingMajorityAcks = False
 			self.ackarray = []
@@ -477,11 +488,13 @@ class Prm(object):
 						print ("Sent Decide message to node ", dest_id)
 						#self.proposedFile is None because it got reset already
 						msg = Message(self.id, self.ballot, None, None, self.index, self.id, self.proposedFile, Message.DECIDE, self.proposedDictionary)
-						sock.send(str(msg))	
+						#sock.sendall(str(len(str(msg.encode('utf-8')) + '||')
+						#print "OWEJFOWIEJFOI", len(str(msg.encode('utf-8'))
+						sock.sendall(str(msg))	
 					print "ADDING TO LOG", self.proposedFile, self.index
 					self.addToLog(self.proposedFile, self.proposedDictionary, self.index)
 					#periodically send updates to all other nodes
-					sendUpdatesThread = threading.Thread(target = self.sendUpdates, args=(self.index-1,))
+					sendUpdatesThread = threading.Thread(target = self.sendallUpdates, args=(self.index-1,))
 					sendUpdatesThread.daemon = True
 					sendUpdatesThread.start()
 					
@@ -491,7 +504,7 @@ class Prm(object):
 				self.acceptarray = []
 
 				#Tell the CLI you finished replicating
-				self.cli[1].send("finishReplicating " + str(self.index-1) + " " + self.log[self.index-1])
+				self.cli[1].sendall("finishReplicating " + str(self.index-1) + " " + self.log[self.index-1])
 				time.sleep(0.5)
 				self.newRoundCleanUp()
 			
@@ -503,7 +516,7 @@ class Prm(object):
 					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
 						print ("Sending Prepare to node ", dest_id)
 						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE, None)
-						sock.send(str(msg))	
+						sock.sendall(str(msg))	
 			
 			self.checkingMajorityAccepts = False
 			self.acceptarray = []
@@ -515,7 +528,7 @@ class Prm(object):
 			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an update message
 				#print ("Sending Update Message to node ", dest_id)
 				msg = Message(self.id, self.ballot, None, None, index, None, self.log[index], Message.UPDATE, self.logDictionary[index])
-				sock.send(str(msg))	  
+				sock.sendall(str(msg))	  
 	
 	def checkHeartBeat(self):
 		time.sleep(0.4)
@@ -534,7 +547,7 @@ class Prm(object):
 				if not self.isDecided:
 					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a prepare message
 						msg = Message(self.id, self.ballot, None, self.proposedFile, self.index, self.id, None, Message.PREPARE, None)
-						sock.send(str(msg))	  
+						sock.sendall(str(msg))	  
 	
 
 	def addToLog(self, value, dictionary, index): #if get an update with higher index than your log, resize
@@ -576,7 +589,8 @@ class Prm(object):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.listeningSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.listeningSocket.bind( (IP, port) )
-		self.listeningSocket.setblocking(0) 
+		self.listeningSocket.settimeout(0.2)
+		#self.listeningSocket.setblocking(0) 
 		self.listeningSocket.listen(1)
 		self.listening = True
 

@@ -83,7 +83,7 @@ def commThread(prm):
 						if msg.index < prm.index: 
 							try:
 								updateMessage = Message(prm.id, prm.ballot, None, None, prm.index, prm.proposedFile, None, Message.UPDATE, None)
-									socke.sendall(updateMessage)
+								socke.sendall(updateMessage)
 							except Exception:
 								pass
 							print "The index you proposed has already been set in the log"
