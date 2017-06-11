@@ -367,7 +367,7 @@ class Prm(object):
 		self.proposedDictionary = {}
 		self.num_nodes = 0
 		self.heartBeat = [False]*15
-		self.heartBeat[self.id-1] = True
+		self.heartBeat[self.id-5001] = True
 		self.ballot = "0," + str(site_id) 
 		self.acceptTuple =  "0,0" #Default acceptTuple if None
 		self.acceptVal = "-1" #Default acceptVal if None
