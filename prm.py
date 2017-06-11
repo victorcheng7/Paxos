@@ -543,6 +543,7 @@ class Prm(object):
 			counter = 0
 			for logDictionary in self.logDictionary:
 				temp2[counter] = logDictionary
+				counter += 1
 			temp[index] = value
 			temp2[index] = dictionary
 			self.log = temp[:]
