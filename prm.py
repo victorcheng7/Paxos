@@ -62,6 +62,7 @@ def commThread(prm):
 						if msg.msgType == Message.ISDECIDEDFALSE:
 							prm.isDecided = False 
 					except Exception:
+						print "Changing size of receive to ", int(msg) 
 						try:
 							size = int(msg)
 						except Exception:
