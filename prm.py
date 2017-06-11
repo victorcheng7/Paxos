@@ -50,18 +50,19 @@ def commThread(prm):
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
 				data = con.recv(1024)
-				try:
-					for msg in Message.split(data):
+				for msg in Message.split(data):
+					try:
 						msg = Message.reconstructFromString(msg.strip())
 						if msg.msgType == Message.ISDECIDEDFALSE:
 							prm.isDecided = False 
-				except Exception:
-					continue
+					except Exception:
+						print "reconstructFromString errror"
+						continue
 					
-				if prm.listening and not prm.isDecided:
-					#incoming messages from other PRMS
-					for msg in Message.split(data):
-						msg = Message.reconstructFromString(msg.strip())
+					if prm.listening and not prm.isDecided:
+						#incoming messages from other PRMS
+						#for msg in Message.split(data):
+						#msg = Message.reconstructFromString(msg.strip())
 
 						if msg.msgType == Message.PREPARE:
 							print ("Received Prepare Message from ", msg.source_id, msg.ballot, msg.index, msg.originalPRM, msg.msgType)
@@ -70,6 +71,11 @@ def commThread(prm):
 							prm.outgoing_channels[msg.source_id].send(str(heartBeatMsg))
 							
 							if msg.index < prm.index: 
+								try:
+									updateMessage = Message(prm.id, prm.ballot, None, None, prm.index, prm.proposedFile, None, Message.UPDATE, None)
+ 									socke.send(updateMessage)
+								except Exception:
+									pass
 								print "The index you proposed has already been set in the log"
 							else:
 								msgBallotTuple = msg.ballot.split(",") # ex "1,0"
@@ -120,6 +126,11 @@ def commThread(prm):
 							print "INSIDE OF Message.DECIDE receive from ", msg.source_id
 							prm.isDecided = True
 							if msg.index > prm.index:
+								try:
+									updateMessage = Message(prm.id, prm.ballot, None, None, prm.index, prm.proposedFile, None, Message.UPDATE, None)
+ 									socke.send(updateMessage)
+								except Exception:
+									pass
 								print "The index you proposed has already been set in the log"
 								#send(prm.id, prm.index, "UPDATE") to msg.originalPRM
 							elif msg.index == prm.index: 
@@ -500,7 +511,7 @@ class Prm(object):
 	def sendUpdates(self, index):
 		print "Inside of sendUpdates"
 		while True:
-			time.sleep(1)
+			time.sleep(2.3)
 			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an update message
 				#print ("Sending Update Message to node ", dest_id)
 				msg = Message(self.id, self.ballot, None, None, index, None, self.log[index], Message.UPDATE, self.logDictionary[index])
