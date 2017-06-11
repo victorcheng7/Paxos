@@ -48,13 +48,21 @@ def commThread(prm):
 
 	#size = 150000
 	size = 1024
+	q = Queue() #keep track of sourceid and byte value
 	while True:
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
-				while (size > 0):
-					data = con.recv(1024)
-					size -= 1024
-				size = 1024
+				if q.empty() or (!q.empty() and (source_id != q.get()[0]))
+					while (size > 0):
+						data = con.recv(1024)
+						size -= 1024
+					size = 1024
+				else:
+					newsize = q.get()[1]
+					while (newsize > 0):
+						data = con.recv(1024)
+						newsize -= 1024
+					q.task_done()
 				#data = con.recv(10000000) # change this according to the message
 				for msg in Message.split(data):
 					try:
@@ -62,10 +70,12 @@ def commThread(prm):
 						if msg.msgType == Message.ISDECIDEDFALSE:
 							prm.isDecided = False 
 					except Exception:
+						values = msg.split("&")
 						#ALSO CHANGE MESSAGE SOURCE_ID so you could do it on the next iteration
-						print "Changing size of receive to ", int(msg) 
+						print "Changing size of receive to ", int(values[1]) 
 						try:
-							size = int(msg)
+							size = int(values[1])
+							sizearray.append((values[0], values[1]))
 						except Exception:
 							print "Error on parsing size and changing the size"
 						continue
