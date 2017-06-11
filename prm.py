@@ -49,7 +49,7 @@ def commThread(prm):
 	while True:
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
-				data = con.recv(500000) # change this according to the message
+				data = con.recv(1000000) # change this according to the message
 				for msg in Message.split(data):
 					try:
 						msg = Message.reconstructFromString(msg.strip())
@@ -440,10 +440,11 @@ class Prm(object):
 					self.acceptTuple = highestAcceptNum
 					self.acceptVal = highestAcceptVal
 				print "Setting acceptNum to ", self.acceptTuple, self.acceptVal
-				for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an accept message
-						print ("Sent Accept message to node ", dest_id)
-						msg = Message(self.id, self.ballot, None, self.acceptVal, self.index, self.id, None, Message.ACCEPT, None) #MAY CAUSE ERROR CAUSE SELF.INDEX IS NOT ACCURATE
-						sock.send(str(msg))	
+				if not self.isDecided:
+					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an accept message
+							print ("Sent Accept message to node ", dest_id)
+							msg = Message(self.id, self.ballot, None, self.acceptVal, self.index, self.id, None, Message.ACCEPT, None) #MAY CAUSE ERROR CAUSE SELF.INDEX IS NOT ACCURATE
+							sock.send(str(msg))	
 			
 			else: 
 				time.sleep(randint(10,30)/10.0)
