@@ -52,7 +52,7 @@ def commThread(prm):
 			try:
 				while (size > 0):
 					data = con.recv(1024)
-					size -= 
+					size -= 1024
 				size = 150000
 				#size = 1024
 				#data = con.recv(10000000) # change this according to the message
@@ -62,10 +62,10 @@ def commThread(prm):
 							if msg.msgType == Message.ISDECIDEDFALSE:
 								prm.isDecided = False 
 						except Exception:
-							'''
-							if message is byte size, set the byte size expectation to while loop that number until reaches
-								num/1024 at a time OR it doesn't get anything in the next gap iteration
-							'''
+							try:
+								size = int(msg)
+							except Exception:
+								print "Error on parsing size and changing the size"
 							continue
 
 					
@@ -488,7 +488,7 @@ class Prm(object):
 						print ("Sent Decide message to node ", dest_id)
 						#self.proposedFile is None because it got reset already
 						msg = Message(self.id, self.ballot, None, None, self.index, self.id, self.proposedFile, Message.DECIDE, self.proposedDictionary)
-						sock.sendall(len(str(msg.encode('utf-8'))
+						sock.sendall(str(len(str(msg.encode('utf-8')) + &)
 						print "OWEJFOWIEJFOI", len(str(msg.encode('utf-8'))
 						sock.sendall(str(msg))	
 					print "ADDING TO LOG", self.proposedFile, self.index
