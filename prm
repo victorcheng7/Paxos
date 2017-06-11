@@ -49,7 +49,7 @@ def commThread(prm):
 	while True:
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
-				data = con.recv(10000000)
+				data = con.recv(2^31)
 				#data = con.recv(10000000) # change this according to the message
 				for msg in Message.split(data):
 				#try:
