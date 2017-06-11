@@ -45,17 +45,27 @@ def commThread(prm):
 	prm.incoming_channels.pop(prm.cli[0], None)
 	prm.cli[1].sendall("finishedSetup")
 
-
+	size = 150000
+	#size = 1024
 	while True:
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
-				data = con.recv(10000000) # change this according to the message
+				while (size > 0):
+					data = con.recv(1024)
+					size -= 
+				size = 150000
+				#size = 1024
+				#data = con.recv(10000000) # change this according to the message
 				for msg in Message.split(data):
 					try:
 						msg = Message.reconstructFromString(msg.strip())
 						if msg.msgType == Message.ISDECIDEDFALSE:
 							prm.isDecided = False 
 					except Exception:
+						'''
+							if message is byte size, set the byte size expectation to while loop that number until reaches
+							num/1024 at a time OR it doesn't get anything in the next gap iteration
+						'''
 						continue
 					
 					if prm.listening and not prm.isDecided:
