@@ -45,14 +45,14 @@ def commThread(prm):
 	prm.incoming_channels.pop(prm.cli[0], None)
 	prm.cli[1].sendall("finishedSetup")
 
-	size = 150000
+	#size = 150000
 	#size = 1024
 	while True:
 		for source_id, con in prm.incoming_channels.iteritems():  
 			try:
 				#while (size > 0):
 				data = con.recv(1024)
-				size -= 1024
+				#size -= 1024
 				#size = 150000
 				#size = 1024
 				#data = con.recv(10000000) # change this according to the message
@@ -62,10 +62,10 @@ def commThread(prm):
 						if msg.msgType == Message.ISDECIDEDFALSE:
 							prm.isDecided = False 
 					except Exception:
-						try:
-							size = int(msg)
-						except Exception:
-							print "Error on parsing size and changing the size"
+						#try:
+						#	size = int(msg)
+						#except Exception:
+						#	print "Error on parsing size and changing the size"
 						continue
 
 					
@@ -138,7 +138,7 @@ def commThread(prm):
 						if msg.index > prm.index:
 							try:
 								updateMessage = Message(prm.id, prm.ballot, None, None, prm.index, prm.proposedFile, None, Message.UPDATE, None)
-									socke.sendall(updateMessage)
+								socke.sendall(updateMessage)
 							except Exception:
 								pass
 							print "The index you proposed has already been set in the log"
