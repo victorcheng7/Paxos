@@ -213,13 +213,13 @@ def setup(cli, setup_file):
 				cli.prm = cli.establishConnection((IP2, port2))
 
 				# start mappers and reducer
-				subprocess.Popen(["python", "mapper.py", "0", str(cli.id), "setup2.txt"])
+				subprocess.Popen(["python", "mapper.py", "0", str(cli.id), sys.argv[2]])
 				cli.mapper1 = cli.establishConnection((map1IP, map1Port))
 
-				subprocess.Popen(["python", "mapper.py", "1", str(cli.id), "setup2.txt"])
+				subprocess.Popen(["python", "mapper.py", "1", str(cli.id), sys.argv[2]])
 				cli.mapper2 = cli.establishConnection((map2IP, map2Port))	
 
-				subprocess.Popen(["python", "reducer.py", str(cli.id), "setup2.txt"])
+				subprocess.Popen(["python", "reducer.py", str(cli.id), sys.argv[2]])
 				cli.reducer = cli.establishConnection(("127.0.0.1", reducerPort))
 
 				
