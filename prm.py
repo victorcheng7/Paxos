@@ -73,10 +73,7 @@ def commThread(prm):
 						#ALSO CHANGE MESSAGE SOURCE_ID so you could do it on the next iteration
 						print "Changing size of receive to ", int(values[0]), int(values[1]) 
 						try:
-							#size = int(values[1])
-							q.put((values[0], values[1]))
-						except Exception:
-							print "Error on parsing size and changing the size"
+							q.puts(int(values[0]), int(values[1]))
 						continue
 
 					
