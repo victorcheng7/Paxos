@@ -220,7 +220,7 @@ def setup(cli, setup_file):
 				cli.mapper2 = cli.establishConnection((map2IP, map2Port))	
 
 				subprocess.Popen(["python", "reducer.py", str(cli.id), "setup2.txt"])
-				cli.reducer = cli.establishConnection((reducerIP, reducerPort))
+				cli.reducer = cli.establishConnection(("127.0.0.1", reducerPort))
 
 				
 				cli.connections = [cli.prm, cli.mapper1, cli.mapper2, cli.reducer]
