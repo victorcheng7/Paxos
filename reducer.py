@@ -30,20 +30,16 @@ def commThread(reducer):
 
 				data = incoming.recv(1024)
 				splitData = data.split(" ")
-				print data
 
 				if splitData[0] == "reduce":
-					print "got reduce"
 					orig_file = splitData[1][:splitData[1].find("_I_")]
 					word_dict = {}
 					for file in splitData[1:]:
 						reducer.addWords(file, word_dict)
 
 					reducer.writetoFile(orig_file + "_reduced", word_dict)
-					print reducer.cons
 					for con in reducer.cons:
 						outgoing = con[1]
-						print "sending file over"
 						outgoing.sendall("receive {0}_reduced ".format(orig_file))
 
 						with open(orig_file + "_reduced",'rb') as f:
@@ -52,7 +48,6 @@ def commThread(reducer):
 					reducer.outgoingSocket.send("Finished. Reduced file is " + orig_file + "_reduced")
 
 				if splitData[0] == "receive":
-					print "got receive"
 
 					contents = []
 					contents.append(" ".join(splitData[2:]))
@@ -63,7 +58,6 @@ def commThread(reducer):
 							data = incoming.recv(1024)
 
 							if not data:
-								print "print stopped receiving"
 								break
 
 							contents.append(data)
@@ -102,7 +96,6 @@ def setup(reducer, setup_file):
 				_, _, _, _, _, _, _, _, reducerIP, reducerPort = line.strip().split()
 
 				reducer.cons.append(reducer.establishConnection((reducerIP, int(reducerPort))))
-	print "reducer established connections!"
 class Reducer(object):
 	def __init__(self, my_id):
 		self.cli_id = my_id
