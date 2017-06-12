@@ -18,26 +18,63 @@ def main():
 	cThread = threading.Thread(target = commThread, args=(reducer,))
 	cThread.start()
 
+
 def commThread(reducer):
 
+
+
 	while True:
-		try:
-			data = reducer.incomingStream.recv(1024)
-			splitData = data.split(" ")
+		for con in reducer.cons:
+			incoming = con[0]
+			try:
 
-			
-			if splitData[0] == "reduce":
-				orig_file = splitData[1][:splitData[1].find("_I_")]
-				word_dict = {}
-				for file in splitData[1:]:
-					reducer.addWords(file, word_dict)
+				data = incoming.recv(1024)
+				splitData = data.split(" ")
+				print data
 
-				reducer.writetoFile(orig_file + "_reduced", word_dict)
-				reducer.outgoingSocket.send("Finished. Reduced file is " + orig_file + "_reduced")
+				if splitData[0] == "reduce":
+					print "got reduce"
+					orig_file = splitData[1][:splitData[1].find("_I_")]
+					word_dict = {}
+					for file in splitData[1:]:
+						reducer.addWords(file, word_dict)
 
-		except socket.error, e:
-			continue
+					reducer.writetoFile(orig_file + "_reduced", word_dict)
+					print reducer.cons
+					for con in reducer.cons:
+						outgoing = con[1]
+						print "sending file over"
+						outgoing.sendall("receive {0}_reduced ".format(orig_file))
 
+						with open(orig_file + "_reduced",'rb') as f:
+							outgoing.sendall(f.read())
+
+					reducer.outgoingSocket.send("Finished. Reduced file is " + orig_file + "_reduced")
+
+				if splitData[0] == "receive":
+					print "got receive"
+
+					contents = []
+					contents.append(" ".join(splitData[2:]))
+					fname = splitData[1]
+					while True:
+
+						try:
+							data = incoming.recv(1024)
+
+							if not data:
+								print "print stopped receiving"
+								break
+
+							contents.append(data)
+						except socket.error, e:
+							break
+
+					with open(fname , 'wb') as f:
+						f.write(b''.join(contents))
+
+			except socket.error, e:
+				continue
 
 def setup(reducer, setup_file):
 	#Read setup file. ex - setup.txt      
@@ -48,36 +85,31 @@ def setup(reducer, setup_file):
 			lineNum += 1
 			if lineNum == reducer.cli_id:
 				IP1, port1, _, _, _, _, _, _, reducerIP, reducerPort = line.strip().split()
-
 				reducer.openListeningSocket((reducerIP, int(reducerPort)))
 
-				# connect with cli
-				while True:
-					try: 
-						sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-						sock.connect((IP1, int(port1)))
-						reducer.outgoingSocket = sock
-						break
-					except Exception:
-						continue
+				cli_con = reducer.establishConnection((IP1, int(port1)))
+				reducer.incomingStream = cli_con[0]
+				reducer.outgoingSocket = cli_con[1]
 
-				# accept from cli
-				while True:
-					try:
-						con, _ = reducer.listeningSocket.accept()
-						con.setblocking(0)
-						reducer.incomingStream = con
-						break
-					except socket.error:
-						continue
+				reducer.cons.append(cli_con)
 
+	with open(setup_file, 'r') as ff:
+		N = int(ff.readline().strip())
+		lineNum = 0
+		for line in ff.readlines():
+			lineNum += 1
+			if lineNum != reducer.cli_id:
+				_, _, _, _, _, _, _, _, reducerIP, reducerPort = line.strip().split()
+
+				reducer.cons.append(reducer.establishConnection((reducerIP, int(reducerPort))))
+	print "reducer established connections!"
 class Reducer(object):
 	def __init__(self, my_id):
 		self.cli_id = my_id
 		self.outgoingSocket = None
 		self.incomingStream = None
 		self.listeningSocket = None
-
+		self.cons = []
 
 	def openListeningSocket(self, addr):
 		self.listeningSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -114,6 +146,34 @@ class Reducer(object):
 			file.seek(-1,2)
 
 		file.close()
+
+	def establishConnection(self, addr):
+		# establish incoming and outgoing connection
+
+		outgoingSocket = None
+		incomingStream = None
+
+		# outgoing
+		while True:
+			try: 
+				sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+				sock.connect(addr)
+				outgoingSocket = sock
+				break
+			except Exception:
+				continue
+
+		# incoming
+		while True:
+			try:
+				con, addr = self.listeningSocket.accept()
+				con.setblocking(0)
+				incomingStream = con
+				break
+			except socket.error:
+				continue
+
+		return [incomingStream, outgoingSocket]
 
 
 

@@ -64,7 +64,6 @@ def commThread(prm):
 						newsize -= 1024
 				#data = con.recv(10000000) # change this according to the message
 				for msg in Message.split(data):
-					data = ""
 					try:
 						msg = Message.reconstructFromString(msg.strip())
 						if msg.msgType == Message.ISDECIDEDFALSE:
@@ -217,14 +216,52 @@ def commThread(prm):
 						if val != None:
 							print "Index {0} : {1}".format(idx, val)
 							
+				# elif splitData[0] == "total":
+				# 	try:
+				# 		count = 0
+				# 		for num in splitData[1:]:
+				# 			pos = int(num)
+				# 			word_dict = prm.logDictionary[pos]
+				# 			for word, freq in word_dict.iteritems():
+				# 				count += freq
+
+				# 		print "Total word count is {0}".format(count)
+
+				# 	except:
+				# 		print "Error: Invalid indices, log has only {0} entries.".format(len(prm.log))
+
+				# elif splitData[0] == "merge":
+				# 	merged_dict = {}
+
+				# 	try:
+				# 		merged_dict = {}
+				# 		for num in splitData[1:]:
+				# 			pos = int(num)
+				# 			word_dict = prm.logDictionary[pos]
+
+				# 			for word, freq in word_dict.iteritems():
+				# 				if word in merged_dict:
+				# 					merged_dict[word] += freq
+				# 				else:
+				# 					merged_dict[word] = freq
+
+				# 		print "Word List"
+				# 		print "---------------------"
+
+				# 		for key, val in merged_dict.iteritems():
+				# 			print "{0} {1}".format(key, val)
+
+				# 	except:
+				# 		print "Error: Invalid indices, log has only {0} entries.".format(len(prm.log))
 				elif splitData[0] == "total":
 					try:
 						count = 0
 						for num in splitData[1:]:
 							pos = int(num)
-							word_dict = prm.logDictionary[pos]
-							for word, freq in word_dict.iteritems():
-								count += freq
+							file = open(prm.log[pos], "r")
+							for line in file:
+								count += int(line.strip('\n\r').split()[1])
+							file.close()
 
 						print "Total word count is {0}".format(count)
 
@@ -232,24 +269,32 @@ def commThread(prm):
 						print "Error: Invalid indices, log has only {0} entries.".format(len(prm.log))
 
 				elif splitData[0] == "merge":
-					merged_dict = {}
+					word_dict = {}
 
 					try:
-						merged_dict = {}
+						word_dict = {}
 						for num in splitData[1:]:
 							pos = int(num)
-							word_dict = prm.logDictionary[pos]
+							file = open(prm.log[pos], "r")
 
-							for word, freq in word_dict.iteritems():
-								if word in merged_dict:
-									merged_dict[word] += freq
+							for line in file:
+								lineSplit = line.strip('\n\r').split()
+
+								word = lineSplit[0]
+								count = int(lineSplit[1])
+
+								if word in word_dict:
+									word_dict[word] += count
 								else:
-									merged_dict[word] = freq
+									word_dict[word] = count
+							file.close()
+
+
 
 						print "Word List"
 						print "---------------------"
 
-						for key, val in merged_dict.iteritems():
+						for key, val in word_dict.iteritems():
 							print "{0} {1}".format(key, val)
 
 					except:
@@ -365,12 +410,12 @@ class Message(object):
 		if msgType == Message.DECIDE:
 			originalPRM = int(keyWords[4])
 			log = keyWords[5]
-			logDictionary = json.loads(keyWords[6])
+			#logDictionary = json.loads(keyWords[6])
 			#for word, count in logDictionary.iteritems():
 			#	print word, count
 		if msgType == Message.UPDATE:
 			log = keyWords[4]		
-			logDictionary = json.loads(keyWords[5])
+			#logDictionary = json.loads(keyWords[5])
 			#print keyWords[5].trumpet
 			#for word, count in logDictionary.iteritems():
 			#	print word, count
@@ -500,8 +545,10 @@ class Prm(object):
 					for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms a decide message
 						print ("Sent Decide message to node ", dest_id)
 						#self.proposedFile is None because it got reset already
-						msg = Message(self.id, self.ballot, None, None, self.index, self.id, self.proposedFile, Message.DECIDE, self.proposedDictionary)
-						sock.sendall(str(self.id) + '&' + str(sys.getsizeof(msg)) + '||')
+						msg = Message(self.id, self.ballot, None, None, self.index, self.id, self.proposedFile, Message.DECIDE, None)
+
+						#msg = Message(self.id, self.ballot, None, None, self.index, self.id, self.proposedFile, Message.DECIDE, self.proposedDictionary)
+						#sock.sendall(str(self.id) + '&' + str(sys.getsizeof(msg)) + '||')
 						sock.sendall(str(msg))	
 					print "ADDING TO LOG", self.proposedFile, self.index
 					self.addToLog(self.proposedFile, self.proposedDictionary, self.index)
@@ -532,16 +579,18 @@ class Prm(object):
 			
 			self.checkingMajorityAccepts = False
 			self.acceptarray = []
-	'''
+	
 	def sendUpdates(self, index):
 		print "Inside of sendUpdates"
 		while True:
 			time.sleep(2.3)
 			for dest_id, sock in self.outgoing_channels.iteritems():#Send all prms an update message
 				#print ("Sending Update Message to node ", dest_id)
-				msg = Message(self.id, self.ballot, None, None, index, None, self.log[index], Message.UPDATE, self.logDictionary[index])
+				msg = Message(self.id, self.ballot, None, None, index, None, self.log[index], Message.UPDATE, None)
+
+				#msg = Message(self.id, self.ballot, None, None, index, None, self.log[index], Message.UPDATE, self.logDictionary[index])
 				sock.sendall(str(msg))	  
-	'''
+	
 	def checkHeartBeat(self):
 		time.sleep(0.4)
 		counter = 0
