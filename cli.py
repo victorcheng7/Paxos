@@ -174,9 +174,10 @@ def commThread(cli):
 
 			try:
 				data = con[0].recv(1024)
-				print data
-				print "[CLI]$",
-				sys.stdout.flush()
+				if con != cli.reducer:
+					print data
+					print "[CLI]$",
+					sys.stdout.flush()
 
 
 				# if splitData[0] == "taskFinished":
