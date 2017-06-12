@@ -74,6 +74,8 @@ def commThread(prm):
 						print "Changing size of receive to ", int(values[0]), int(values[1]) 
 						try:
 							q.puts(int(values[0]), int(values[1]))
+						except Exception:
+							pass
 						continue
 
 					
