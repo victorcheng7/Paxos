@@ -45,7 +45,8 @@ def commThread(reducer):
 						with open(orig_file + "_reduced",'rb') as f:
 							outgoing.sendall(f.read())
 
-					reducer.outgoingSocket.send("Finished. Reduced file is " + orig_file + "_reduced")
+					for con in reducer.cons:
+						reducer.outgoingSocket.send("Finished. Reduced file is " + orig_file + "_reduced")
 
 				if splitData[0] == "receive":
 
