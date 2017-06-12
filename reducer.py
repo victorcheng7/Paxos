@@ -87,7 +87,7 @@ def setup(reducer, setup_file):
 				IP1, port1, _, _, _, _, _, _, reducerIP, reducerPort = line.strip().split()
 				reducer.openListeningSocket((reducerIP, int(reducerPort)))
 
-				cli_con = reducer.establishConnection((IP1, int(port1)))
+				cli_con = reducer.establishConnection(("127.0.0.1", int(port1)))
 				reducer.incomingStream = cli_con[0]
 				reducer.outgoingSocket = cli_con[1]
 
