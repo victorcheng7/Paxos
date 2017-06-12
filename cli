@@ -178,8 +178,8 @@ def commThread(cli):
 					print data
 					print "[CLI]$",
 					sys.stdout.flush()
-				else :
-					if data.split()[0] == "Finished."
+				else:
+					if data.split()[0] == "Finished." :
 						print data
 						print "[CLI]$",
 						sys.stdout.flush()
