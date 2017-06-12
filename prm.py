@@ -155,7 +155,7 @@ def commThread(prm):
 								print "The index you proposed has already been set in the log"
 								#send(prm.id, prm.index, "UPDATE") to msg.originalPRM
 							elif msg.index == prm.index: 
-								prm.addToLog(msg.log, msg.logDictionary, msg.index) #filename into log
+								prm.addToLog(msg.log, msg.index) #filename into log
 								prm.newRoundCleanUp()
 								#send the cli that you've finished replicating and what the log entry will be
 								prm.cli[1].sendall("finishReplicating " + str(msg.index) + " " + prm.log[msg.index])
@@ -163,7 +163,7 @@ def commThread(prm):
 
 						if msg.msgType == Message.UPDATE:
 							#print "Updated message received"
-							prm.addToLog(msg.log, msg.logDictionary, msg.index)
+							prm.addToLog(msg.log, msg.index)
 							#once you updated your log, send back the update source_id that you've completed and stop sending once everyone is updated, prm.updatedarray keep track of state on how many are updated
 						
 
@@ -550,7 +550,7 @@ class Prm(object):
 						#sock.sendall(str(self.id) + '&' + str(sys.getsizeof(msg)) + '||')
 						sock.sendall(str(msg))	
 					print "ADDING TO LOG", self.proposedFile, self.index
-					self.addToLog(self.proposedFile, self.proposedDictionary, self.index)
+					self.addToLog(self.proposedFile, self.index)
 					#periodically send updates to all other nodes
 					sendUpdatesThread = threading.Thread(target = self.sendUpdates, args=(self.index-1,))
 					sendUpdatesThread.daemon = True
@@ -610,27 +610,27 @@ class Prm(object):
 						sock.sendall(str(msg))	  
 	
 
-	def addToLog(self, value, dictionary, index): #if get an update with higher index than your log, resize
+	def addToLog(self, value, index): #if get an update with higher index than your log, resize
 		try: 
 			if self.log[index] == None:
 				self.log[index] = value
-				self.logDictionary[index] = dictionary
+				#self.logDictionary[index] = dictionary
 				self.index += 1
 		except Exception: 
 			temp = [None]*(index+1)
-			temp2 = [None]*(index+1)
+			#temp2 = [None]*(index+1)
 			counter = 0
 			for logValue in self.log:
 				temp[counter] = logValue
 				counter += 1
-			counter = 0
-			for logDictionary in self.logDictionary:
-				temp2[counter] = logDictionary
-				counter += 1
+			#counter = 0
+			#for logDictionary in self.logDictionary:
+			#	temp2[counter] = logDictionary
+			#	counter += 1
 			temp[index] = value
-			temp2[index] = dictionary
+			#temp2[index] = dictionary
 			self.log = temp[:]
-			self.logDictionary = temp2[:]
+			#self.logDictionary = temp2[:]
 			self.index += 1
 
 
