@@ -1,0 +1,1 @@
+This repository contains the testing files for cs171. To clone it, type git clone https://bitbucket.org/victorzakhary/cs171demofiles.git
