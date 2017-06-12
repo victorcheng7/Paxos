@@ -50,7 +50,7 @@ def checkIsReducedFile(filename):
 		print "Error: Empty file"
 		return False
 
-	matcher = re.compile(r'*')
+	matcher = re.compile(r'[a-zA-z][a-z]*')
 	#check if all lines valid
 	for entry in entry_list:
 		
