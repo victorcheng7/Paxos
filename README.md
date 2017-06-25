@@ -1,5 +1,7 @@
 # Paxos
 
+Our implementation of Paxos Distributed System 
+
 To run:
 
 #shortcut get started
